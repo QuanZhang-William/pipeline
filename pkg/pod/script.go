@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/tektoncd/pipeline/pkg/apis/config"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"github.com/tektoncd/pipeline/pkg/names"
 	corev1 "k8s.io/api/core/v1"
@@ -34,7 +35,7 @@ const (
 	debugInfoVolumeName    = "tekton-internal-debug-info"
 	scriptsDir             = "/tekton/scripts"
 	debugScriptsDir        = "/tekton/debug/scripts"
-	defaultScriptPreamble  = "#!/bin/sh\nset -e\n"
+	defaultScriptPreamble  = "#!/bin/sh\n"
 	debugInfoDir           = "/tekton/debug/info"
 )
 
@@ -70,7 +71,7 @@ var (
 )
 
 // convertScripts converts any steps and sidecars that specify a Script field into a normal Container.
-func convertScripts(shellImageLinux string, shellImageWin string, steps []v1beta1.Step, sidecars []v1beta1.Sidecar, debugConfig *v1beta1.TaskRunDebug) (*corev1.Container, []corev1.Container, []corev1.Container) {
+func convertScripts(shellImageLinux string, shellImageWin string, steps []v1beta1.Step, sidecars []v1beta1.Sidecar, debugConfig *v1beta1.TaskRunDebug, featureFlag *config.FeatureFlags) (*corev1.Container, []corev1.Container, []corev1.Container) {
 	placeScripts := false
 	// Place scripts is an init container used for creating scripts in the
 	// /tekton/scripts directory which would be later used by the step containers
@@ -113,10 +114,10 @@ func convertScripts(shellImageLinux string, shellImageWin string, steps []v1beta
 		placeScriptsInit.VolumeMounts = append(placeScriptsInit.VolumeMounts, debugScriptsVolumeMount)
 	}
 
-	convertedStepContainers := convertListOfSteps(steps, &placeScriptsInit, &placeScripts, breakpoints, "script")
+	convertedStepContainers := convertListOfSteps(steps, &placeScriptsInit, &placeScripts, breakpoints, "script", featureFlag)
 
 	// Pass empty breakpoint list in "sidecar step to container" converter to not rewrite the scripts and add breakpoints to sidecar
-	sidecarContainers := convertListOfSteps(sideCarSteps, &placeScriptsInit, &placeScripts, []string{}, "sidecar-script")
+	sidecarContainers := convertListOfSteps(sideCarSteps, &placeScriptsInit, &placeScripts, []string{}, "sidecar-script", featureFlag)
 	if placeScripts {
 		return &placeScriptsInit, convertedStepContainers, sidecarContainers
 	}
@@ -127,8 +128,10 @@ func convertScripts(shellImageLinux string, shellImageWin string, steps []v1beta
 //
 // It iterates through the list of steps (or sidecars), generates the script file name and heredoc termination string,
 // adds an entry to the init container args, sets up the step container to run the script, and sets the volume mounts.
-func convertListOfSteps(steps []v1beta1.Step, initContainer *corev1.Container, placeScripts *bool, breakpoints []string, namePrefix string) []corev1.Container {
+func convertListOfSteps(steps []v1beta1.Step, initContainer *corev1.Container, placeScripts *bool, breakpoints []string, namePrefix string, featureFlag *config.FeatureFlags) []corev1.Container {
 	containers := []corev1.Container{}
+	defaultScriptPreambleWithFlags := applyScriptModeFlags(featureFlag)
+
 	for i, s := range steps {
 		// Add debug mounts if breakpoints are present
 		if len(breakpoints) > 0 {
@@ -153,7 +156,7 @@ func convertListOfSteps(steps []v1beta1.Step, initContainer *corev1.Container, p
 
 		script := s.Script
 		if !hasShebang {
-			script = defaultScriptPreamble + s.Script
+			script = defaultScriptPreambleWithFlags + s.Script
 		}
 
 		// At least one step uses a script, so we should return a
@@ -209,12 +212,13 @@ cat > ${scriptfile} << '%s'
 			name    string
 			content string
 		}
+
 		debugScripts := []script{{
 			name:    "continue",
-			content: defaultScriptPreamble + fmt.Sprintf(debugContinueScriptTemplate, len(steps), debugInfoDir, runDir),
+			content: defaultScriptPreambleWithFlags + fmt.Sprintf(debugContinueScriptTemplate, len(steps), debugInfoDir, runDir),
 		}, {
 			name:    "fail-continue",
-			content: defaultScriptPreamble + fmt.Sprintf(debugFailScriptTemplate, len(steps), debugInfoDir, runDir),
+			content: defaultScriptPreambleWithFlags + fmt.Sprintf(debugFailScriptTemplate, len(steps), debugInfoDir, runDir),
 		}}
 
 		// Add debug or breakpoint related scripts to /tekton/debug/scripts
@@ -284,4 +288,13 @@ func extractWindowsScriptComponents(script string, fileName string) ([]string, [
 	}
 
 	return command, args, script, fileName
+}
+
+func applyScriptModeFlags(featureFlag *config.FeatureFlags) string {
+	defaultScriptPreambleWithFlags := defaultScriptPreamble
+	if featureFlag.EnableScriptImmediateExit {
+		defaultScriptPreambleWithFlags += "set -e\n"
+	}
+
+	return defaultScriptPreambleWithFlags
 }

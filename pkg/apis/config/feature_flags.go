@@ -55,6 +55,8 @@ const (
 	DefaultEnableAPIFields = StableAPIFields
 	// DefaultSendCloudEventsForRuns is the default value for "send-cloudevents-for-runs".
 	DefaultSendCloudEventsForRuns = false
+	// DefaultEnableScriptImmediateExit is the default value for "enable-script-immediate-exit".
+	DefaultEnableScriptImmediateExit = true
 	// DefaultEmbeddedStatus is the default value for "embedded-status".
 	DefaultEmbeddedStatus = FullEmbeddedStatus
 
@@ -66,6 +68,7 @@ const (
 	enableCustomTasks                   = "enable-custom-tasks"
 	enableAPIFields                     = "enable-api-fields"
 	sendCloudEventsForRuns              = "send-cloudevents-for-runs"
+	enableScriptImmediateExit           = "enable-script-immediate-exit"
 	embeddedStatus                      = "embedded-status"
 )
 
@@ -81,6 +84,7 @@ type FeatureFlags struct {
 	ScopeWhenExpressionsToTask       bool
 	EnableAPIFields                  string
 	SendCloudEventsForRuns           bool
+	EnableScriptImmediateExit        bool
 	EmbeddedStatus                   string
 }
 
@@ -113,6 +117,9 @@ func NewFeatureFlagsFromMap(cfgMap map[string]string) (*FeatureFlags, error) {
 		return nil, err
 	}
 	if err := setFeature(disableCredsInitKey, DefaultDisableCredsInit, &tc.DisableCredsInit); err != nil {
+		return nil, err
+	}
+	if err := setFeature(enableScriptImmediateExit, DefaultEnableScriptImmediateExit, &tc.EnableScriptImmediateExit); err != nil {
 		return nil, err
 	}
 	if err := setFeature(runningInEnvWithInjectedSidecarsKey, DefaultRunningInEnvWithInjectedSidecars, &tc.RunningInEnvWithInjectedSidecars); err != nil {

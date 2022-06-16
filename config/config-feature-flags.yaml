@@ -73,3 +73,6 @@ data:
   # Setting this flag to "true" enables CloudEvents for Runs, as long as a
   # CloudEvents sink is configured in the config-defaults config map
   send-cloudevents-for-runs: "false"
+  # Setting this flag to "true" enables bash pipeline to exit immediately
+  # if it returns a non-zero status
+  enable-script-immediate-exit: "true"
