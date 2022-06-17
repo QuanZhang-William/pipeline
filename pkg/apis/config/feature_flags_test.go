@@ -38,6 +38,7 @@ func TestNewFeatureFlagsFromConfigMap(t *testing.T) {
 				RunningInEnvWithInjectedSidecars: config.DefaultRunningInEnvWithInjectedSidecars,
 				EnableAPIFields:                  "stable",
 				EmbeddedStatus:                   config.DefaultEmbeddedStatus,
+				EnableScriptImmediateExit:        true,
 			},
 			fileName: config.GetFeatureFlagsConfigName(),
 		},
@@ -51,6 +52,7 @@ func TestNewFeatureFlagsFromConfigMap(t *testing.T) {
 				EnableAPIFields:                  "alpha",
 				SendCloudEventsForRuns:           true,
 				EmbeddedStatus:                   "both",
+				EnableScriptImmediateExit:        false,
 			},
 			fileName: "feature-flags-all-flags-set",
 		},
@@ -59,8 +61,9 @@ func TestNewFeatureFlagsFromConfigMap(t *testing.T) {
 				EnableAPIFields: "alpha",
 				// These are prescribed as true by enabling "alpha" API fields, even
 				// if the submitted text value is "false".
-				EnableTektonOCIBundles: true,
-				EnableCustomTasks:      true,
+				EnableTektonOCIBundles:    true,
+				EnableCustomTasks:         true,
+				EnableScriptImmediateExit: true,
 
 				RunningInEnvWithInjectedSidecars: config.DefaultRunningInEnvWithInjectedSidecars,
 				EmbeddedStatus:                   config.DefaultEmbeddedStatus,
@@ -69,9 +72,10 @@ func TestNewFeatureFlagsFromConfigMap(t *testing.T) {
 		},
 		{
 			expectedConfig: &config.FeatureFlags{
-				EnableAPIFields:        "stable",
-				EnableTektonOCIBundles: true,
-				EnableCustomTasks:      true,
+				EnableAPIFields:           "stable",
+				EnableTektonOCIBundles:    true,
+				EnableCustomTasks:         true,
+				EnableScriptImmediateExit: true,
 
 				RunningInEnvWithInjectedSidecars: config.DefaultRunningInEnvWithInjectedSidecars,
 				EmbeddedStatus:                   config.DefaultEmbeddedStatus,
@@ -95,6 +99,7 @@ func TestNewFeatureFlagsFromEmptyConfigMap(t *testing.T) {
 		RunningInEnvWithInjectedSidecars: true,
 		EnableAPIFields:                  "stable",
 		EmbeddedStatus:                   config.DefaultEmbeddedStatus,
+		EnableScriptImmediateExit:        true,
 	}
 	verifyConfigFileWithExpectedFeatureFlagsConfig(t, FeatureFlagsConfigEmptyName, expectedConfig)
 }
