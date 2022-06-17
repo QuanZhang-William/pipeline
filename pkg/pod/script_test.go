@@ -20,17 +20,10 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/tektoncd/pipeline/pkg/apis/config"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"github.com/tektoncd/pipeline/test/diff"
 	"github.com/tektoncd/pipeline/test/names"
 	corev1 "k8s.io/api/core/v1"
-)
-
-var (
-	featureFlags = &config.FeatureFlags{
-		EnableScriptImmediateExit: true,
-	}
 )
 
 func TestConvertScripts_NothingToConvert_EmptySidecars(t *testing.T) {
@@ -38,7 +31,7 @@ func TestConvertScripts_NothingToConvert_EmptySidecars(t *testing.T) {
 		Image: "step-1",
 	}, {
 		Image: "step-2",
-	}}, []v1beta1.Sidecar{}, nil, featureFlags)
+	}}, []v1beta1.Sidecar{}, nil, true)
 	want := []corev1.Container{{
 		Image: "step-1",
 	}, {
@@ -61,7 +54,7 @@ func TestConvertScripts_NothingToConvert_NilSidecars(t *testing.T) {
 		Image: "step-1",
 	}, {
 		Image: "step-2",
-	}}, nil, nil, featureFlags)
+	}}, nil, nil, true)
 	want := []corev1.Container{{
 		Image: "step-1",
 	}, {
@@ -86,7 +79,7 @@ func TestConvertScripts_NothingToConvert_WithSidecar(t *testing.T) {
 		Image: "step-2",
 	}}, []v1beta1.Sidecar{{
 		Image: "sidecar-1",
-	}}, nil, featureFlags)
+	}}, nil, true)
 	want := []corev1.Container{{
 		Image: "step-1",
 	}, {
@@ -142,7 +135,7 @@ script-3`,
 		Image:        "step-3",
 		VolumeMounts: preExistingVolumeMounts,
 		Args:         []string{"my", "args"},
-	}}, []v1beta1.Sidecar{}, nil, featureFlags)
+	}}, []v1beta1.Sidecar{}, nil, true)
 	wantInit := &corev1.Container{
 		Name:    "place-scripts",
 		Image:   images.ShellImage,
@@ -234,7 +227,7 @@ script-3`,
 		Args:         []string{"my", "args"},
 	}}, []v1beta1.Sidecar{}, &v1beta1.TaskRunDebug{
 		Breakpoint: []string{breakpointOnFailure},
-	}, featureFlags)
+	}, true)
 
 	wantInit := &corev1.Container{
 		Name:    "place-scripts",
@@ -377,7 +370,7 @@ script-3`,
 		Script: `#!/bin/sh
 sidecar-1`,
 		Image: "sidecar-1",
-	}}, nil, featureFlags)
+	}}, nil, true)
 	wantInit := &corev1.Container{
 		Name:    "place-scripts",
 		Image:   images.ShellImage,
@@ -471,7 +464,7 @@ no-shebang`,
 		Image:        "step-3",
 		VolumeMounts: preExistingVolumeMounts,
 		Args:         []string{"my", "args"},
-	}}, []v1beta1.Sidecar{}, nil, featureFlags)
+	}}, []v1beta1.Sidecar{}, nil, true)
 	wantInit := &corev1.Container{
 		Name:    "place-scripts",
 		Image:   images.ShellImageWin,
@@ -552,7 +545,7 @@ script-3`,
 		Script: `#!win pwsh -File
 sidecar-1`,
 		Image: "sidecar-1",
-	}}, nil, featureFlags)
+	}}, nil, true)
 	wantInit := &corev1.Container{
 		Name:    "place-scripts",
 		Image:   images.ShellImageWin,
@@ -622,7 +615,7 @@ func TestConvertScripts_Windows_SidecarOnly(t *testing.T) {
 		Script: `#!win python
 sidecar-1`,
 		Image: "sidecar-1",
-	}}, nil, featureFlags)
+	}}, nil, true)
 	wantInit := &corev1.Container{
 		Name:    "place-scripts",
 		Image:   images.ShellImageWin,
