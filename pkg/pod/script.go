@@ -22,7 +22,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/tektoncd/pipeline/pkg/apis/config"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"github.com/tektoncd/pipeline/pkg/names"
 	corev1 "k8s.io/api/core/v1"
@@ -292,13 +291,4 @@ func extractWindowsScriptComponents(script string, fileName string) ([]string, [
 	}
 
 	return command, args, script, fileName
-}
-
-func applyScriptModeFlags(featureFlag *config.FeatureFlags) string {
-	defaultScriptPreambleWithFlags := defaultScriptPreamble
-	if featureFlag.EnableScriptImmediateExit {
-		defaultScriptPreambleWithFlags += "set -e\n"
-	}
-
-	return defaultScriptPreambleWithFlags
 }

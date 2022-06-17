@@ -192,7 +192,59 @@ _EOF_
 	if len(gotSidecars) != 0 {
 		t.Errorf("Expected zero sidecars, got %v", len(gotSidecars))
 	}
+}
 
+func TestConvertScripts_WithoutScriptImmedateExit(t *testing.T) {
+	names.TestingSeed()
+
+	preExistingVolumeMounts := []corev1.VolumeMount{{
+		Name:      "pre-existing-volume-mount",
+		MountPath: "/mount/path",
+	}, {
+		Name:      "another-one",
+		MountPath: "/another/one",
+	}}
+
+	gotInit, gotSteps, gotSidecars := convertScripts(images.ShellImage, images.ShellImageWin, []v1beta1.Step{{
+		Script:       `no-shebang`,
+		Image:        "step-1",
+		VolumeMounts: preExistingVolumeMounts,
+		Args:         []string{"my", "args"},
+	}}, []v1beta1.Sidecar{}, nil, false)
+
+	wantInit := &corev1.Container{
+		Name:    "place-scripts",
+		Image:   images.ShellImage,
+		Command: []string{"sh"},
+		Args: []string{"-c", `scriptfile="/tekton/scripts/script-0-9l9zj"
+touch ${scriptfile} && chmod +x ${scriptfile}
+cat > ${scriptfile} << '_EOF_'
+IyEvYmluL3NoCm5vLXNoZWJhbmc=
+_EOF_
+/tekton/bin/entrypoint decode-script "${scriptfile}"
+`},
+		VolumeMounts: []corev1.VolumeMount{writeScriptsVolumeMount, binMount},
+	}
+	want := []corev1.Container{{
+		Image:   "step-1",
+		Command: []string{"/tekton/scripts/script-0-9l9zj"},
+		Args:    []string{"my", "args"},
+		VolumeMounts: []corev1.VolumeMount{
+			{Name: "pre-existing-volume-mount", MountPath: "/mount/path"},
+			{Name: "another-one", MountPath: "/another/one"},
+			scriptsVolumeMount,
+		},
+	}}
+
+	if d := cmp.Diff(wantInit, gotInit); d != "" {
+		t.Errorf("Init Container Diff %s", diff.PrintWantGot(d))
+	}
+	if d := cmp.Diff(want, gotSteps); d != "" {
+		t.Errorf("Containers Diff %s", diff.PrintWantGot(d))
+	}
+	if len(gotSidecars) != 0 {
+		t.Errorf("Expected zero sidecars, got %v", len(gotSidecars))
+	}
 }
 
 func TestConvertScripts_WithBreakpoint_OnFailure(t *testing.T) {
