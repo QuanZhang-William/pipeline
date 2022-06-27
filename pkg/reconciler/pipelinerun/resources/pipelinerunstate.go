@@ -179,9 +179,6 @@ func (state PipelineRunState) GetTaskRunsResults() map[string][]v1beta1.TaskRunR
 		if rpt.IsCustomTask() {
 			continue
 		}
-		if !rpt.isSuccessful() {
-			continue
-		}
 		if rpt.TaskRun != nil {
 			results[rpt.PipelineTask.Name] = rpt.TaskRun.Status.TaskRunResults
 		}
