@@ -602,9 +602,11 @@ func (c *Reconciler) reconcile(ctx context.Context, pr *v1beta1.PipelineRun, get
 	}
 
 	pr.Status.SkippedTasks = pipelineRunFacts.GetSkippedTasks()
-	pr.Status.PipelineResults = resources.ApplyTaskResultsToPipelineResults(pipelineSpec.Results,
-		pipelineRunFacts.State.GetTaskRunsResults(), pipelineRunFacts.State.GetRunsResults())
-
+	if after.Status == corev1.ConditionTrue ||
+		after.Status == corev1.ConditionFalse && after.Reason == v1beta1.PipelineRunReasonFailed.String() {
+		pr.Status.PipelineResults = resources.ApplyTaskResultsToPipelineResults(pipelineSpec.Results,
+			pipelineRunFacts.State.GetTaskRunsResults(), pipelineRunFacts.State.GetRunsResults())
+	}
 	logger.Infof("PipelineRun %s status is being set to %s", pr.Name, after)
 	return nil
 }
