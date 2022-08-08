@@ -75,6 +75,8 @@ type pipelineRunStatusCount struct {
 	Succeeded int
 	// failed tasks count
 	Failed int
+	// failed tasks count
+	IgnoredFailed int
 	// cancelled tasks count
 	Cancelled int
 	// number of tasks which are still pending, have not executed
@@ -632,11 +634,12 @@ func (facts *PipelineRunFacts) checkFinalTasksDone() bool {
 // getPipelineTasksCount returns the count of successful tasks, failed tasks, cancelled tasks, skipped task, and incomplete tasks
 func (facts *PipelineRunFacts) getPipelineTasksCount() pipelineRunStatusCount {
 	s := pipelineRunStatusCount{
-		Skipped:    0,
-		Succeeded:  0,
-		Failed:     0,
-		Cancelled:  0,
-		Incomplete: 0,
+		Skipped:       0,
+		Succeeded:     0,
+		Failed:        0,
+		IgnoredFailed: 0,
+		Cancelled:     0,
+		Incomplete:    0,
 	}
 	for _, t := range facts.State {
 		switch {
@@ -648,7 +651,12 @@ func (facts *PipelineRunFacts) getPipelineTasksCount() pipelineRunStatusCount {
 			s.Cancelled++
 		// increment failure counter since the task has failed
 		case t.isFailure():
-			s.Failed++
+			if t.OnError == "continue" {
+				s.IgnoredFailed++
+			} else {
+				s.Failed++
+			}
+
 		// increment skip counter since the task is skipped
 		case t.Skip(facts).IsSkipped:
 			s.Skipped++

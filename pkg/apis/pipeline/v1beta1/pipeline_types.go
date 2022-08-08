@@ -218,6 +218,9 @@ type PipelineTask struct {
 	// Refer Go's ParseDuration documentation for expected format: https://golang.org/pkg/time/#ParseDuration
 	// +optional
 	Timeout *metav1.Duration `json:"timeout,omitempty"`
+
+	// can be set to [ continue | stopAndFail ]
+	OnError string `json:"timeout,omitempty"`
 }
 
 // validateRefOrSpec validates at least one of taskRef or taskSpec is specified
