@@ -220,7 +220,7 @@ type PipelineTask struct {
 	Timeout *metav1.Duration `json:"timeout,omitempty"`
 
 	// can be set to [ continue | stopAndFail ]
-	OnError string `json:"timeout,omitempty"`
+	OnError string `json:"onError,omitempty"`
 }
 
 // validateRefOrSpec validates at least one of taskRef or taskSpec is specified
