@@ -1638,6 +1638,13 @@ func TestGetPipelineConditionStatus(t *testing.T) {
 		expectedFailed     int
 		expectedCancelled  int
 	}{{
+		name:           "one-ignored-task-failed",
+		state:          oneIgnoredFailedState,
+		expectedStatus: corev1.ConditionTrue,
+		expectedReason: v1beta1.PipelineRunReasonFailed.String(),
+		//expectedFailed:  1,
+		//expectedSkipped: 1,
+	}, {
 		name:               "no-tasks-started",
 		state:              noneStartedState,
 		expectedStatus:     corev1.ConditionUnknown,

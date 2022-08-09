@@ -429,6 +429,16 @@ var oneFailedState = PipelineRunState{{
 	},
 }}
 
+var oneIgnoredFailedState = PipelineRunState{{
+	PipelineTask: &pts[0],
+	TaskRunName:  "pipelinerun-mytask1",
+	OnError:      "continue",
+	TaskRun:      makeFailed(trs[0]),
+	ResolvedTaskResources: &resources.ResolvedTaskResources{
+		TaskSpec: &task.Spec,
+	},
+}}
+
 var finalScheduledState = PipelineRunState{{
 	PipelineTask: &pts[0],
 	TaskRunName:  "pipelinerun-mytask1",

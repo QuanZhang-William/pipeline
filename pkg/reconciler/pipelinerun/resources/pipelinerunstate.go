@@ -453,7 +453,7 @@ func (facts *PipelineRunFacts) GetPipelineConditionStatus(ctx context.Context, p
 	// get the count of successful tasks, failed tasks, cancelled tasks, skipped task, and incomplete tasks
 	s := facts.getPipelineTasksCount()
 	// completed task is a collection of successful, failed, cancelled tasks (skipped tasks are reported separately)
-	cmTasks := s.Succeeded + s.Failed + s.Cancelled
+	cmTasks := s.Succeeded + s.Failed + s.Cancelled + s.IgnoredFailed
 
 	// The completion reason is set from the TaskRun completion reason
 	// by default, set it to ReasonRunning
