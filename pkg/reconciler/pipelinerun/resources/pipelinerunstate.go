@@ -649,7 +649,7 @@ func (facts *PipelineRunFacts) getPipelineTasksCount() pipelineRunStatusCount {
 			s.Cancelled++
 		// increment failure counter since the task has failed
 		case t.isFailure():
-			if t.OnError == "continue" {
+			if t.PipelineTask.OnError == "continue" {
 				s.IgnoredFailed++
 			} else {
 				s.Failed++

@@ -163,6 +163,10 @@ var pts = []v1beta1.PipelineTask{{
 		Name:  "browser",
 		Value: v1beta1.ArrayOrString{ArrayVal: []string{"safari", "chrome"}},
 	}},
+}, {
+	Name:    "mytask22",
+	TaskRef: &v1beta1.TaskRef{Name: "task"},
+	OnError: "continue",
 }}
 
 var p = &v1beta1.Pipeline{
@@ -430,9 +434,8 @@ var oneFailedState = PipelineRunState{{
 }}
 
 var oneIgnoredFailedState = PipelineRunState{{
-	PipelineTask: &pts[0],
+	PipelineTask: &pts[21],
 	TaskRunName:  "pipelinerun-mytask1",
-	OnError:      "continue",
 	TaskRun:      makeFailed(trs[0]),
 	ResolvedTaskResources: &resources.ResolvedTaskResources{
 		TaskSpec: &task.Spec,

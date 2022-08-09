@@ -70,7 +70,6 @@ type ResolvedPipelineTask struct {
 	Runs                  []*v1alpha1.Run
 	PipelineTask          *v1beta1.PipelineTask
 	ResolvedTaskResources *resources.ResolvedTaskResources
-	OnError               string
 }
 
 // isDone returns true only if the task is skipped, succeeded or failed
