@@ -20,6 +20,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -82,69 +83,29 @@ func (rr *realRunner) Run(ctx context.Context, args ...string) error {
 	defer signal.Reset()
 
 	cmd := exec.CommandContext(ctx, name, args...)
-	stopCh := make(chan struct{}, 1)
-	defer close(stopCh)
 
-	cmd.Stdout = os.Stdout
-	var stdoutFile *os.File
+	// Build a list of tee readers that we'll read from after the command is
+	// is started. If we are not configured to tee stdout/stderr this will be
+	// empty and contents will not be copied.
+	var readers []*namedReader
 	if rr.stdoutPath != "" {
-		var err error
-		var doneCh <-chan error
-		// Create directory if it doesn't already exist
-		if err = os.MkdirAll(filepath.Dir(rr.stdoutPath), os.ModePerm); err != nil {
+		stdout, err := newTeeReader(cmd.StdoutPipe, rr.stdoutPath)
+		if err != nil {
 			return err
 		}
-		if stdoutFile, err = os.Create(rr.stdoutPath); err != nil {
-			return err
-		}
-		// We use os.Pipe in asyncWriter to copy stdout instead of cmd.StdoutPipe or providing an
-		// io.Writer directly because otherwise Go would wait for the underlying fd to be closed by the
-		// child process before returning from cmd.Wait even if the process is no longer running. This
-		// would cause a deadlock if the child spawns a long running descendant process before exiting.
-		if cmd.Stdout, doneCh, err = asyncWriter(io.MultiWriter(os.Stdout, stdoutFile), stopCh); err != nil {
-			return err
-		}
-		go func() {
-			if err := <-doneCh; err != nil {
-				log.Fatalf("Copying stdout: %v", err)
-			}
-			stdoutFile.Close()
-		}()
+		readers = append(readers, stdout)
+	} else {
+		// This needs to be set in an else since StdoutPipe will fail if cmd.Stdout is already set.
+		cmd.Stdout = os.Stdout
 	}
-
-	cmd.Stderr = os.Stderr
-	var stderrFile *os.File
 	if rr.stderrPath != "" {
-		var err error
-		var doneCh <-chan error
-		if rr.stderrPath == rr.stdoutPath {
-			fd, err := syscall.Dup(int(stdoutFile.Fd()))
-			if err != nil {
-				return err
-			}
-			stderrFile = os.NewFile(uintptr(fd), rr.stderrPath)
-		} else {
-			// Create directory if it doesn't already exist
-			if err = os.MkdirAll(filepath.Dir(rr.stderrPath), os.ModePerm); err != nil {
-				return err
-			}
-			if stderrFile, err = os.Create(rr.stderrPath); err != nil {
-				return err
-			}
-		}
-		// We use os.Pipe in asyncWriter to copy stderr instead of cmd.StderrPipe or providing an
-		// io.Writer directly because otherwise Go would wait for the underlying fd to be closed by the
-		// child process before returning from cmd.Wait even if the process is no longer running. This
-		// would cause a deadlock if the child spawns a long running descendant process before exiting.
-		if cmd.Stderr, doneCh, err = asyncWriter(io.MultiWriter(os.Stderr, stderrFile), stopCh); err != nil {
+		stderr, err := newTeeReader(cmd.StderrPipe, rr.stderrPath)
+		if err != nil {
 			return err
 		}
-		go func() {
-			if err := <-doneCh; err != nil {
-				log.Fatalf("Copying stderr: %v", err)
-			}
-			stderrFile.Close()
-		}()
+		readers = append(readers, stderr)
+	} else {
+		cmd.Stderr = os.Stderr
 	}
 
 	// dedicated PID group used to forward signals to
@@ -173,6 +134,22 @@ func (rr *realRunner) Run(ctx context.Context, args ...string) error {
 		}
 	}()
 
+	wg := new(sync.WaitGroup)
+	for _, r := range readers {
+		wg.Add(1)
+		// Read concurrently so that we can pipe stdout and stderr at the same
+		// time.
+		go func(r *namedReader) {
+			defer wg.Done()
+			if _, err := io.ReadAll(r); err != nil {
+				log.Printf("error reading to %s: %v", r.name, err)
+			}
+		}(r)
+	}
+
+	// Wait for stdout/err buffers to finish reading before returning.
+	wg.Wait()
+
 	// Wait for command to exit
 	if err := cmd.Wait(); err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
@@ -182,4 +159,38 @@ func (rr *realRunner) Run(ctx context.Context, args ...string) error {
 	}
 
 	return nil
+}
+
+// newTeeReader creates a new Reader that copies data from the given pipe function
+// (i.e. cmd.StdoutPipe, cmd.StderrPipe) into a file specified by path.
+// The file is opened with os.O_WRONLY|os.O_CREATE|os.O_APPEND, and will not
+// override any existing content in the path. This means that the same file can
+// be used for multiple streams if desired.
+// The behavior of the Reader is the same as io.TeeReader - reads from the pipe
+// will be written to the file.
+func newTeeReader(pipe func() (io.ReadCloser, error), path string) (*namedReader, error) {
+	in, err := pipe()
+	if err != nil {
+		return nil, fmt.Errorf("error creating pipe: %w", err)
+	}
+
+	if err := os.MkdirAll(filepath.Dir(path), os.ModePerm); err != nil {
+		return nil, fmt.Errorf("error creating parent directory: %w", err)
+	}
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0600)
+	if err != nil {
+		return nil, fmt.Errorf("error opening %s: %w", path, err)
+	}
+
+	return &namedReader{
+		name:   path,
+		Reader: io.TeeReader(in, f),
+	}, nil
+}
+
+// namedReader is just a helper struct that lets us give a reader a name for
+// logging purposes.
+type namedReader struct {
+	io.Reader
+	name string
 }

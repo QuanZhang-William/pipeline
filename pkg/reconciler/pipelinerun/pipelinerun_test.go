@@ -87,6 +87,7 @@ var (
 	ignoreTypeMeta           = cmpopts.IgnoreFields(metav1.TypeMeta{}, "Kind", "APIVersion")
 	ignoreLastTransitionTime = cmpopts.IgnoreFields(apis.Condition{}, "LastTransitionTime.Inner.Time")
 	ignoreStartTime          = cmpopts.IgnoreFields(v1beta1.PipelineRunStatusFields{}, "StartTime")
+	ignoreCompletionTime     = cmpopts.IgnoreFields(v1beta1.PipelineRunStatusFields{}, "CompletionTime")
 	trueb                    = true
 	simpleHelloWorldTask     = &v1beta1.Task{ObjectMeta: baseObjectMeta("hello-world", "foo")}
 	simpleSomeTask           = &v1beta1.Task{ObjectMeta: baseObjectMeta("some-task", "foo")}
@@ -4776,8 +4777,365 @@ func TestReconcileWithPipelineResults(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			runTestReconcileWithPipelineResults(t, tc.embeddedVal)
+			runTestReconcileWithFinallyResults(t, tc.embeddedVal)
 		})
 	}
+}
+
+func runTestReconcileWithFinallyResults(t *testing.T, embeddedStatus string) {
+	names.TestingSeed()
+	ps := []*v1beta1.Pipeline{parse.MustParsePipeline(t, `
+metadata:
+  name: test-pipeline
+  namespace: foo
+spec:
+  results:
+    - description: pipeline result
+      name: result
+      value: $(finally.a-task.results.a-Result)
+    - description: custom task pipeline result
+      name: custom-result
+      value: $(finally.b-task.results.b-Result)
+  tasks:
+    - name: c-task
+      taskRef:
+        name: c-task
+  finally:
+    - name: a-task
+      taskRef:
+        name: a-task
+    - name: b-task
+      taskRef:
+        name: b-task
+`)}
+	trs := []*v1beta1.TaskRun{mustParseTaskRunWithObjectMeta(t,
+		taskRunObjectMeta("test-pipeline-run-finally-results-task-run-a", "foo",
+			"test-pipeline-run-finally-results", "test-pipeline", "a-task", true),
+		`
+spec:
+  taskRef:
+    name: hello-world
+status:
+  conditions:
+  - status: "True"
+    type: Succeeded
+  taskResults:
+  - name: a-Result
+    value: aResultValue
+`), mustParseTaskRunWithObjectMeta(t,
+		taskRunObjectMeta("test-pipeline-run-finally-results-task-run-b", "foo",
+			"test-pipeline-run-finally-results", "test-pipeline", "b-task", true),
+		`
+spec:
+  taskRef:
+    name: hello-world
+status:
+  conditions:
+  - status: "True"
+    type: Succeeded
+  taskResults:
+  - name: b-Result
+    value: bResultValue
+`), mustParseTaskRunWithObjectMeta(t,
+		taskRunObjectMeta("test-pipeline-run-finally-results-task-run-c", "foo",
+			"test-pipeline-run-finally-results", "test-pipeline", "c-task", true),
+		`
+spec:
+  taskRef:
+    name: hello-world
+status:
+  conditions:
+  - status: "True"
+    type: Succeeded
+`)}
+	prs := []*v1beta1.PipelineRun{parse.MustParsePipelineRun(t, `
+metadata:
+  name: test-pipeline-run-finally-results
+  namespace: foo
+spec:
+  pipelineRef:
+    name: test-pipeline
+status:
+  conditions:
+  - status: "Unknown"
+    type: Succeeded
+    reason: Succeeded
+`)}
+	ts := []*v1beta1.Task{
+		parse.MustParseTask(t, `
+metadata:
+  name: b-task
+  namespace: foo
+spec:
+  taskRef:
+    apiVersion: example.dev/v0
+    kind: Example
+  results:
+  - name: b-Result
+`),
+		parse.MustParseTask(t, `
+metadata:
+  name: a-task
+  namespace: foo
+spec:
+  results:
+  - name: a-Result
+`),
+		parse.MustParseTask(t, `
+metadata:
+  name: c-task
+  namespace: foo
+spec:
+  steps:
+  - image: ubuntu
+    script: |
+      #!/usr/bin/env bash
+      echo "Hello from bash!"
+  
+`),
+	}
+
+	d := test.Data{
+		PipelineRuns: prs,
+		Pipelines:    ps,
+		Tasks:        ts,
+		TaskRuns:     trs,
+		ConfigMaps:   []*corev1.ConfigMap{withEmbeddedStatus(newFeatureFlagsConfigMap(), embeddedStatus)},
+	}
+	prt := newPipelineRunTest(d, t)
+	defer prt.Cancel()
+	reconciledRun, _ := prt.reconcileRun("foo", "test-pipeline-run-finally-results", []string{}, false)
+
+	expectedPrFullStatus := parse.MustParsePipelineRun(t, `
+metadata:
+  name: test-pipeline-run-finally-results
+  namespace: foo
+  labels:
+    tekton.dev/pipeline: test-pipeline
+  annotations: {}
+spec:
+  pipelineRef:
+    name: test-pipeline
+status:
+  runs: {}
+  pipelineSpec: 
+    results:
+    - description: pipeline result
+      name: result
+      value: $(finally.a-task.results.a-Result)
+    - description: custom task pipeline result
+      name: custom-result
+      value: $(finally.b-task.results.b-Result)
+    tasks:
+    - name: c-task
+      taskRef:
+        name: c-task
+        kind: Task
+    finally:
+    - name: a-task
+      taskRef:
+        name: a-task
+        kind: Task
+    - name: b-task
+      taskRef:
+        name: b-task
+        kind: Task    
+  conditions:
+  - status: "True"
+    type: Succeeded
+    reason: Succeeded
+    message: "Tasks Completed: 3 (Failed: 0, Cancelled 0), Skipped: 0"
+  pipelineResults:
+  - name: result
+    value: aResultValue
+  - name: custom-result
+    value: bResultValue
+  taskRuns:
+    test-pipeline-run-finally-results-task-run-a:
+      pipelineTaskName: a-task
+      status:
+        conditions:
+        - status: "True"
+          type: Succeeded
+        taskResults:
+        - name: a-Result
+          value: aResultValue
+    test-pipeline-run-finally-results-task-run-b:
+      pipelineTaskName: b-task
+      status:
+        conditions:
+        - status: "True"
+          type: Succeeded
+        taskResults:
+        - name: b-Result
+          value: bResultValue
+    test-pipeline-run-finally-results-task-run-c:
+      pipelineTaskName: c-task
+      status:
+        conditions:
+        - status: "True"
+          type: Succeeded
+`)
+
+	expectedPrBothStatus := parse.MustParsePipelineRun(t, `
+metadata:
+  name: test-pipeline-run-finally-results
+  namespace: foo
+  labels:
+    tekton.dev/pipeline: test-pipeline
+  annotations: {}
+spec:
+  pipelineRef:
+    name: test-pipeline
+status:
+  runs: {}
+  pipelineSpec: 
+    results:
+    - description: pipeline result
+      name: result
+      value: $(finally.a-task.results.a-Result)
+    - description: custom task pipeline result
+      name: custom-result
+      value: $(finally.b-task.results.b-Result)
+    tasks:
+    - name: c-task
+      taskRef:
+        name: c-task
+        kind: Task
+    finally:
+    - name: a-task
+      taskRef:
+        name: a-task
+        kind: Task
+    - name: b-task
+      taskRef: 
+        name: b-task
+        kind: Task
+  conditions:
+  - status: "True"
+    type: Succeeded
+    reason: Succeeded
+    message: "Tasks Completed: 3 (Failed: 0, Cancelled 0), Skipped: 0"
+  pipelineResults:
+  - name: result
+    value: aResultValue
+  - name: custom-result
+    value: bResultValue
+  childReferences:
+  - apiVersion: tekton.dev/v1beta1
+    kind: TaskRun
+    name: test-pipeline-run-finally-results-task-run-c
+    pipelineTaskName: c-task
+  - apiVersion: tekton.dev/v1beta1
+    kind: TaskRun
+    name: test-pipeline-run-finally-results-task-run-a
+    pipelineTaskName: a-task
+  - apiVersion: tekton.dev/v1beta1
+    kind: TaskRun
+    name: test-pipeline-run-finally-results-task-run-b
+    pipelineTaskName: b-task
+  taskRuns:
+    test-pipeline-run-finally-results-task-run-a:
+      pipelineTaskName: a-task
+      status:
+        conditions:
+        - status: "True"
+          type: Succeeded
+        taskResults:
+        - name: a-Result
+          value: aResultValue
+    test-pipeline-run-finally-results-task-run-b:
+      pipelineTaskName: b-task
+      status:
+        conditions:
+        - status: "True"
+          type: Succeeded
+        taskResults:
+        - name: b-Result
+          value: bResultValue
+    test-pipeline-run-finally-results-task-run-c:
+      pipelineTaskName: c-task
+      status:
+        conditions:
+        - status: "True"
+          type: Succeeded
+`)
+
+	expectedPrMinimalStatus := parse.MustParsePipelineRun(t, `
+metadata:
+  name: test-pipeline-run-finally-results
+  namespace: foo
+  labels:
+    tekton.dev/pipeline: test-pipeline
+  annotations: {}
+spec:
+  pipelineRef:
+    name: test-pipeline
+status:
+  runs: {}
+  pipelineSpec: 
+    results:
+    - description: pipeline result
+      name: result
+      value: $(finally.a-task.results.a-Result)
+    - description: custom task pipeline result
+      name: custom-result
+      value: $(finally.b-task.results.b-Result)
+    tasks:
+    - name: c-task
+      taskRef:
+        name: c-task
+        kind: Task
+    finally:
+    - name: a-task
+      taskRef:
+        name: a-task
+        kind: Task
+    - name: b-task
+      taskRef: 
+        name: b-task
+        kind: Task
+  conditions:
+  - status: "True"
+    type: Succeeded
+    reason: Succeeded
+    message: "Tasks Completed: 3 (Failed: 0, Cancelled 0), Skipped: 0"
+  pipelineResults:
+  - name: result
+    value: aResultValue
+  - name: custom-result
+    value: bResultValue
+  taskRuns: {}
+  childReferences:
+  - apiVersion: tekton.dev/v1beta1
+    kind: TaskRun
+    name: test-pipeline-run-finally-results-task-run-c
+    pipelineTaskName: c-task
+  - apiVersion: tekton.dev/v1beta1
+    kind: TaskRun
+    name: test-pipeline-run-finally-results-task-run-a
+    pipelineTaskName: a-task
+  - apiVersion: tekton.dev/v1beta1
+    kind: TaskRun
+    name: test-pipeline-run-finally-results-task-run-b
+    pipelineTaskName: b-task
+`)
+	var expectedPr *v1beta1.PipelineRun
+	switch {
+	case embeddedStatus == config.BothEmbeddedStatus:
+		expectedPr = expectedPrBothStatus
+	case embeddedStatus == config.DefaultEmbeddedStatus:
+		expectedPr = expectedPrFullStatus
+	case embeddedStatus == config.FullEmbeddedStatus:
+		expectedPr = expectedPrFullStatus
+	case embeddedStatus == config.MinimalEmbeddedStatus:
+		expectedPr = expectedPrMinimalStatus
+	}
+
+	if d := cmp.Diff(expectedPr, reconciledRun, ignoreResourceVersion, ignoreLastTransitionTime, ignoreCompletionTime, ignoreStartTime); d != "" {
+		t.Errorf("expected to see pipeline run results created. Diff %s", diff.PrintWantGot(d))
+	}
+
 }
 
 func runTestReconcileWithPipelineResults(t *testing.T, embeddedStatus string) {
@@ -9642,6 +10000,97 @@ spec:
 
 			if err := verifyTaskLevelComputeResources(tc.expectedComputeResources, TaskRunList.Items); err != nil {
 				t.Errorf("TaskRun \"%s\" failed to verify task-level compute resource requirements, because: %v", tc.name, err)
+			}
+		})
+	}
+}
+
+func TestReconcile_CancelUnscheduled(t *testing.T) {
+	testCases := []struct {
+		name              string
+		embeddedStatusVal string
+	}{
+		{
+			name:              "default embedded status",
+			embeddedStatusVal: config.DefaultEmbeddedStatus,
+		},
+		{
+			name:              "full embedded status",
+			embeddedStatusVal: config.FullEmbeddedStatus,
+		},
+		{
+			name:              "both embedded status",
+			embeddedStatusVal: config.BothEmbeddedStatus,
+		},
+		{
+			name:              "minimal embedded status",
+			embeddedStatusVal: config.MinimalEmbeddedStatus,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			pipelineRunName := "cancel-test-run"
+			prs := []*v1beta1.PipelineRun{parse.MustParsePipelineRun(t, `metadata:
+  name: cancel-test-run
+  namespace: foo
+spec:
+  pipelineSpec:
+    tasks:
+      - name: wait-1
+        taskSpec:
+          apiVersion: example.dev/v0
+          kind: Wait
+          params:
+            - name: duration
+              value: 1h
+      - name: wait-2
+        runAfter:
+          - wait-1
+        taskSpec:
+          apiVersion: example.dev/v0
+          kind: Wait
+          params:
+            - name: duration
+              value: 10s
+      - name: wait-3
+        runAfter:
+          - wait-1
+        taskRef:
+          name: hello-world
+`)}
+
+			ts := []*v1beta1.Task{simpleHelloWorldTask}
+
+			cms := []*corev1.ConfigMap{withEmbeddedStatus(withCustomTasks(newFeatureFlagsConfigMap()), tc.embeddedStatusVal)}
+
+			d := test.Data{
+				PipelineRuns: prs,
+				Tasks:        ts,
+				ConfigMaps:   cms,
+			}
+			prt := newPipelineRunTest(d, t)
+			defer prt.Cancel()
+
+			pr, clients := prt.reconcileRun("foo", pipelineRunName, []string{}, false)
+
+			if tc.embeddedStatusVal != config.MinimalEmbeddedStatus {
+				if len(pr.Status.Runs) > 1 {
+					t.Errorf("Expected one Run in status, but found %d", len(pr.Status.Runs))
+				}
+				if len(pr.Status.TaskRuns) > 0 {
+					t.Errorf("Expected no TaskRuns in status, but found %d", len(pr.Status.TaskRuns))
+				}
+			}
+			if tc.embeddedStatusVal != config.FullEmbeddedStatus {
+				if len(pr.Status.ChildReferences) > 1 {
+					t.Errorf("Expected one Run or TaskRun in child references, but found %d", len(pr.Status.ChildReferences))
+				}
+			}
+
+			err := cancelPipelineRun(prt.TestAssets.Ctx, logtesting.TestLogger(t), pr, clients.Pipeline)
+			if err != nil {
+				t.Fatalf("Error found: %v", err)
 			}
 		})
 	}
