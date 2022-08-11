@@ -352,7 +352,7 @@ func (state PipelineRunState) getRetryableTasks(candidateTasks sets.String) []*R
 func (facts *PipelineRunFacts) IsStopping() bool {
 	for _, t := range facts.State {
 		if facts.isDAGTask(t.PipelineTask.Name) {
-			if t.isFailure() {
+			if t.isFailure() && t.PipelineTask.OnError != "continue" {
 				return true
 			}
 		}
@@ -463,6 +463,10 @@ func (facts *PipelineRunFacts) GetPipelineConditionStatus(ctx context.Context, p
 		reason := v1beta1.PipelineRunReasonSuccessful.String()
 		message := fmt.Sprintf("Tasks Completed: %d (Failed: %d, Cancelled %d), Skipped: %d",
 			cmTasks, s.Failed, s.Cancelled, s.Skipped)
+		/*
+			message := fmt.Sprintf("Tasks Completed: %d (Failed: %d (%d is ignored), Cancelled %d), Skipped: %d",
+			cmTasks, s.Failed, s.IgnoredFaild, s.Cancelled, s.Skipped)
+		*/
 		// Set reason to ReasonCompleted - At least one is skipped
 		if s.Skipped > 0 {
 			reason = v1beta1.PipelineRunReasonCompleted.String()
