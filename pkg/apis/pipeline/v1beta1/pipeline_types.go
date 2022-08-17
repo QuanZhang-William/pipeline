@@ -218,7 +218,20 @@ type PipelineTask struct {
 	// Refer Go's ParseDuration documentation for expected format: https://golang.org/pkg/time/#ParseDuration
 	// +optional
 	Timeout *metav1.Duration `json:"timeout,omitempty"`
+
+	// OnError defines the exiting behavior of a task on error
+	// can be set to [ continue | stopAndFail ]
+	OnError OnErrorType `json:"onError,omitempty"`
 }
+
+type OnErrorType string
+
+const (
+	// StopAndFail indicates exit the pipeline run if the task run is failed
+	StopAndFail OnErrorType = "stopAndFail"
+	// Continue indicates continue executing the rest of the pipeline irrespective of the status of the task run
+	Continue OnErrorType = "continue"
+)
 
 // validateRefOrSpec validates at least one of taskRef or taskSpec is specified
 func (pt PipelineTask) validateRefOrSpec() (errs *apis.FieldError) {
