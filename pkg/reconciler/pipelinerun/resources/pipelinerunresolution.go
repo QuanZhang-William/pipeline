@@ -415,6 +415,12 @@ func (t *ResolvedPipelineTask) skipBecauseResultReferencesAreMissing(facts *Pipe
 			if err != nil && (t.IsFinalTask(facts) || rpt.Skip(facts).SkippingReason == v1beta1.WhenExpressionsSkip) {
 				return true
 			}
+
+			// TODO: understand rpt.TaskRuns
+			// TODO: test with both order dep and resource dep
+			if err != nil && (t.PipelineTask.OnError == v1beta1.Continue && !rpt.TaskRun.IsSuccessful()) {
+				return true
+			}
 		}
 		ApplyTaskResults(PipelineRunState{t}, resolvedResultRefs)
 		facts.ResetSkippedCache()
