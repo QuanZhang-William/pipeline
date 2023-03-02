@@ -19,6 +19,7 @@ package v1beta1
 import (
 	"context"
 
+	resolverconfig "github.com/tektoncd/pipeline/pkg/apis/config/resolver"
 	"knative.dev/pkg/apis"
 )
 
@@ -35,10 +36,14 @@ func (ps *PipelineSpec) SetDefaults(ctx context.Context) {
 		ps.Params[i].SetDefaults(ctx)
 	}
 
+	resolverCfg := resolverconfig.FromContextOrDefaults(ctx)
 	for _, pt := range ps.Tasks {
 		if pt.TaskRef != nil {
 			if pt.TaskRef.Kind == "" {
 				pt.TaskRef.Kind = NamespacedTaskKind
+			}
+			if pt.TaskRef.Name == "" && pt.TaskRef.Resolver == "" {
+				pt.TaskRef.Resolver = ResolverName(resolverCfg.FeatureFlags.DefaultResolverType)
 			}
 		}
 		if pt.TaskSpec != nil {

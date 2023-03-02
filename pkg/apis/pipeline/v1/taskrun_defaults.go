@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/tektoncd/pipeline/pkg/apis/config"
+	resolverconfig "github.com/tektoncd/pipeline/pkg/apis/config/resolver"
 	pod "github.com/tektoncd/pipeline/pkg/apis/pipeline/pod"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"knative.dev/pkg/apis"
@@ -50,8 +51,19 @@ func (tr *TaskRun) SetDefaults(ctx context.Context) {
 // SetDefaults implements apis.Defaultable
 func (trs *TaskRunSpec) SetDefaults(ctx context.Context) {
 	cfg := config.FromContextOrDefaults(ctx)
-	if trs.TaskRef != nil && trs.TaskRef.Kind == "" {
-		trs.TaskRef.Kind = NamespacedTaskKind
+	resolverCfg := resolverconfig.FromContextOrDefaults(ctx)
+	// if trs.TaskRef != nil && trs.TaskRef.Kind == "" {
+	// 	trs.TaskRef.Kind = NamespacedTaskKind
+	// }
+
+	if trs.TaskRef != nil {
+		if trs.TaskRef.Kind == "" {
+			trs.TaskRef.Kind = NamespacedTaskKind
+		}
+
+		if trs.TaskRef.Resolver == "" {
+			trs.TaskRef.Resolver = ResolverName(resolverCfg.FeatureFlags.DefaultResolverType)
+		}
 	}
 
 	if trs.Timeout == nil {

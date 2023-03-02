@@ -49,8 +49,11 @@ func FromContext(ctx context.Context) *Config {
 // returns a Config populated with the defaults for each of the Config fields.
 func FromContextOrDefaults(ctx context.Context) *Config {
 	if cfg := FromContext(ctx); cfg != nil {
+		fmt.Printf("Quan running in FromContextOrDefaults, got context")
 		return cfg
 	}
+
+	fmt.Printf("Quan running in FromContextOrDefaults, failed to get context")
 	featureFlags, _ := NewFeatureFlagsFromMap(map[string]string{})
 	return &Config{
 		FeatureFlags: featureFlags,

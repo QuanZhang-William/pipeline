@@ -18,6 +18,7 @@ package v1beta1
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/google/go-containerregistry/pkg/name"
 	"knative.dev/pkg/apis"
@@ -47,6 +48,7 @@ func (ref *TaskRef) Validate(ctx context.Context) (errs *apis.FieldError) {
 				errs = errs.Also(apis.ErrMultipleOneOf("bundle", "params"))
 			}
 			if ref.Resolver == "" {
+				fmt.Printf("Quan failed validation, the resolver is: %v !!", ref.Resolver)
 				errs = errs.Also(apis.ErrMissingField("resolver"))
 			}
 			errs = errs.Also(ValidateParameters(ctx, ref.Params))

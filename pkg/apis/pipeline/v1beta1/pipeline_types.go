@@ -311,7 +311,7 @@ func (pt PipelineTask) validateTask(ctx context.Context) (errs *apis.FieldError)
 				errs = errs.Also(apis.ErrInvalidValue(strings.Join(errSlice, ","), "taskRef.name"))
 			}
 		} else if pt.TaskRef.Resolver == "" {
-			errs = errs.Also(apis.ErrInvalidValue("taskRef must specify name", "taskRef.name"))
+			errs = errs.Also(apis.ErrInvalidValue("taskRef must specify name when default resolver is not configured", "taskRef.name"))
 		}
 		// fail if bundle is present when EnableTektonOCIBundles feature flag is off (as it won't be allowed nor used)
 		if !cfg.FeatureFlags.EnableTektonOCIBundles && pt.TaskRef.Bundle != "" {

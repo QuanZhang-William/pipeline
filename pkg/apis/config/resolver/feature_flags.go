@@ -42,6 +42,8 @@ const (
 	EnableBundlesResolver = "enable-bundles-resolver"
 	// EnableClusterResolver is the flag used to enable the cluster remote resolver
 	EnableClusterResolver = "enable-cluster-resolver"
+	// DefaultResolverType is the flag used to specify the default resolver type
+	DefaultResolverType = "default-resolver-type"
 )
 
 // FeatureFlags holds the features configurations
@@ -51,6 +53,7 @@ type FeatureFlags struct {
 	EnableHubResolver     bool
 	EnableBundleResolver  bool
 	EnableClusterResolver bool
+	DefaultResolverType   string
 }
 
 // GetFeatureFlagsConfigName returns the name of the configmap containing all
@@ -90,10 +93,24 @@ func NewFeatureFlagsFromMap(cfgMap map[string]string) (*FeatureFlags, error) {
 	if err := setFeature(EnableClusterResolver, DefaultEnableClusterResolver, &tc.EnableClusterResolver); err != nil {
 		return nil, err
 	}
+	if err := setDefaultResolver(cfgMap, DefaultResolverType, "", &tc.DefaultResolverType); err != nil {
+		return nil, err
+	}
+
+	fmt.Printf("Quan this is actually set to: %v : /n", tc.DefaultResolverType)
 	return &tc, nil
 }
 
 // NewFeatureFlagsFromConfigMap returns a Config for the given configmap
 func NewFeatureFlagsFromConfigMap(config *corev1.ConfigMap) (*FeatureFlags, error) {
 	return NewFeatureFlagsFromMap(config.Data)
+}
+
+func setDefaultResolver(cfgMap map[string]string, key string, defaultValue string, feature *string) error {
+	if cfg, ok := cfgMap[key]; ok {
+		*feature = cfg
+		return nil
+	}
+	*feature = defaultValue
+	return nil
 }

@@ -19,6 +19,7 @@ package config
 import (
 	"context"
 
+	"github.com/tektoncd/pipeline/pkg/apis/config/resolver"
 	sc "github.com/tektoncd/pipeline/pkg/spire/config"
 	"knative.dev/pkg/configmap"
 )
@@ -90,8 +91,10 @@ func NewStore(logger configmap.Logger, onAfterStore ...func(name string, value i
 			"defaults/features/artifacts",
 			logger,
 			configmap.Constructors{
-				GetDefaultsConfigName():         NewDefaultsFromConfigMap,
-				GetFeatureFlagsConfigName():     NewFeatureFlagsFromConfigMap,
+				GetDefaultsConfigName():              NewDefaultsFromConfigMap,
+				GetFeatureFlagsConfigName():          NewFeatureFlagsFromConfigMap,
+				resolver.GetFeatureFlagsConfigName(): resolver.NewFeatureFlagsFromConfigMap,
+				//"something":                     NewFeatureFlagsFromConfigMap,
 				GetArtifactBucketConfigName():   NewArtifactBucketFromConfigMap,
 				GetArtifactPVCConfigName():      NewArtifactPVCFromConfigMap,
 				GetMetricsConfigName():          NewMetricsFromConfigMap,
