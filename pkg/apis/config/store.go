@@ -19,6 +19,7 @@ package config
 import (
 	"context"
 
+	"github.com/tektoncd/pipeline/pkg/apis/config/resolver"
 	sc "github.com/tektoncd/pipeline/pkg/spire/config"
 	"knative.dev/pkg/configmap"
 )
@@ -90,13 +91,15 @@ func NewStore(logger configmap.Logger, onAfterStore ...func(name string, value i
 			"defaults/features/artifacts",
 			logger,
 			configmap.Constructors{
-				GetDefaultsConfigName():         NewDefaultsFromConfigMap,
-				GetFeatureFlagsConfigName():     NewFeatureFlagsFromConfigMap,
-				GetArtifactBucketConfigName():   NewArtifactBucketFromConfigMap,
-				GetArtifactPVCConfigName():      NewArtifactPVCFromConfigMap,
-				GetMetricsConfigName():          NewMetricsFromConfigMap,
-				GetTrustedResourcesConfigName(): NewTrustedResourcesConfigFromConfigMap,
-				GetSpireConfigName():            NewSpireConfigFromConfigMap,
+				GetDefaultsConfigName():              NewDefaultsFromConfigMap,
+				GetFeatureFlagsConfigName():          NewFeatureFlagsFromConfigMap,
+				resolver.GetFeatureFlagsConfigName(): resolver.NewFeatureFlagsFromConfigMap, // Error as it is in "tekton-pipelines-resolver" ns
+				"something":                          resolver.NewFeatureFlagsFromConfigMap, // No error as it is in "tekton-pipelines" ns
+				GetArtifactBucketConfigName():        NewArtifactBucketFromConfigMap,
+				GetArtifactPVCConfigName():           NewArtifactPVCFromConfigMap,
+				GetMetricsConfigName():               NewMetricsFromConfigMap,
+				GetTrustedResourcesConfigName():      NewTrustedResourcesConfigFromConfigMap,
+				GetSpireConfigName():                 NewSpireConfigFromConfigMap,
 			},
 			onAfterStore...,
 		),
