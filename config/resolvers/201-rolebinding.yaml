@@ -50,8 +50,8 @@ subjects:
     name: tekton-pipelines-controller
     namespace: tekton-pipelines
   - kind: ServiceAccount
-    name: tekton-pipelines
-    namespace: default
+    name: default
+    namespace: tekton-pipelines
 roleRef:
   kind: Role
   name: tekton-pipelines-resolvers-namespace-rbac

@@ -152,29 +152,36 @@ func (i *InformedWatcher) getConfigMapNames() []string {
 func (i *InformedWatcher) Start(stopCh <-chan struct{}) error {
 	// using the synced callback wrapper around the add event handler will allow the caller
 	// to wait for the add event to be processed for all configmaps
+	fmt.Printf("Quan Knative start 1 /n")
 	s := newSyncedCallback(i.getConfigMapNames(), i.addConfigMapEvent)
 	addConfigMapEvent := func(obj interface{}) {
 		configMap := obj.(*corev1.ConfigMap)
 		s.Call(obj, configMap.Name)
 	}
+
+	fmt.Printf("Quan Knative start 2 /n")
 	// Pretend that all the defaulted ConfigMaps were just created. This is done before we start
 	// the informer to ensure that if a defaulted ConfigMap does exist, then the real value is
 	// processed after the default one.
 	i.triggerAddEventForDefaultedConfigMaps(addConfigMapEvent)
 
+	fmt.Printf("Quan Knative start 3 /n")
 	if err := i.registerCallbackAndStartInformer(addConfigMapEvent, stopCh); err != nil {
 		return err
 	}
 
+	fmt.Printf("Quan Knative start 4 /n")
 	// Wait until the shared informer has been synced (WITHOUT holing the mutex, so callbacks happen)
 	if ok := cache.WaitForCacheSync(stopCh, i.informer.Informer().HasSynced); !ok {
 		return errors.New("error waiting for ConfigMap informer to sync")
 	}
 
+	fmt.Printf("Quan Knative start 5 /n")
 	if err := i.checkObservedResourcesExist(); err != nil {
 		return err
 	}
 
+	fmt.Printf("Quan Knative start 6 /n")
 	// Wait until all config maps have been at least initially processed
 	return s.WaitForAllKeys(stopCh)
 }
@@ -204,9 +211,12 @@ func (i *InformedWatcher) checkObservedResourcesExist() error {
 	defer i.RUnlock()
 	// Check that all objects with Observers exist in our informers.
 	return i.ForEach(func(k string, _ []configmap.Observer) error {
+		fmt.Printf("Quan Knative ns: %v, name: %v /n", i.Namespace, k)
 		if _, err := i.informer.Lister().ConfigMaps(i.Namespace).Get(k); err != nil {
+			fmt.Printf("Quan Knative err1 ns: %v, name: %v /n", i.Namespace, k)
 			if _, ok := i.defaults[k]; ok && k8serrors.IsNotFound(err) {
 				// It is defaulted, so it is OK that it doesn't exist.
+				fmt.Printf("Quan Knative err2 ns: %v, name: %v /n", i.Namespace, k)
 				return nil
 			}
 			return err

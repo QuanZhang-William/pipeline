@@ -79,7 +79,10 @@ func newDefaultingAdmissionController(name string) func(context.Context, configm
 	return func(ctx context.Context, cmw configmap.Watcher) *controller.Impl {
 		// Decorate contexts with the current state of the config.
 		store := defaultconfig.NewStore(logging.FromContext(ctx).Named("config-store"))
+		resolverStore := defaultconfig.NewStore(logging.FromContext(ctx).Named("resolver-config-store"))
+
 		store.WatchConfigs(cmw)
+		resolverStore.WatchConfigs(cmw)
 		return defaulting.NewAdmissionController(ctx,
 
 			// Name of the resource webhook, it is the value of the environment variable WEBHOOK_ADMISSION_CONTROLLER_NAME
@@ -94,6 +97,7 @@ func newDefaultingAdmissionController(name string) func(context.Context, configm
 
 			// A function that infuses the context passed to Validate/SetDefaults with custom metadata.
 			func(ctx context.Context) context.Context {
+				ctx = resolverStore.ToContext(ctx)
 				return store.ToContext(ctx)
 			},
 
