@@ -1,0 +1,8 @@
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  generateName: demo-pipeline-four-tasks-
+spec:
+  pipelineRef:
+    name: demo-pipeline-four-tasks
+    

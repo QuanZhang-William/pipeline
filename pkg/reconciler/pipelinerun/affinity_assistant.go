@@ -104,6 +104,12 @@ func (c *Reconciler) cleanupAffinityAssistants(ctx context.Context, pr *v1beta1.
 	return errorutils.NewAggregate(errs)
 }
 
+func getExperimentAnchorPodName(pipelineRunName string) string {
+	hashBytes := sha256.Sum256([]byte(pipelineRunName))
+	hashString := fmt.Sprintf("%x", hashBytes)
+	return fmt.Sprintf("%s-%s", "anchor-pod", hashString[:10])
+}
+
 func getAffinityAssistantName(pipelineWorkspaceName string, pipelineRunName string) string {
 	hashBytes := sha256.Sum256([]byte(pipelineWorkspaceName + pipelineRunName))
 	hashString := fmt.Sprintf("%x", hashBytes)

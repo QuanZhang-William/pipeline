@@ -1,0 +1,34 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: demo-pipeline-four-tasks
+spec:
+  tasks:
+    - name: say-hello
+      taskSpec:
+        steps:
+        - image: busybox
+          command: ["/bin/sh", "-c"]
+          args:
+            - echo hello
+    - name: say-word
+      taskSpec:
+        steps:
+        - image: busybox
+          command: ["/bin/sh", "-c"]
+          args:
+            - echo word
+    - name: say-hello-again
+      taskSpec:
+        steps:
+        - image: busybox
+          command: ["/bin/sh", "-c"]
+          args:
+            - echo hello again
+    - name: say-word-again
+      taskSpec:
+        steps:
+        - image: busybox
+          command: ["/bin/sh", "-c"]
+          args:
+            - echo world again
