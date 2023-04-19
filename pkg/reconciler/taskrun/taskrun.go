@@ -36,6 +36,7 @@ import (
 	listers "github.com/tektoncd/pipeline/pkg/client/listers/pipeline/v1beta1"
 	"github.com/tektoncd/pipeline/pkg/internal/affinityassistant"
 	"github.com/tektoncd/pipeline/pkg/internal/computeresources"
+	"github.com/tektoncd/pipeline/pkg/internal/experimentpod"
 	resolutionutil "github.com/tektoncd/pipeline/pkg/internal/resolution"
 	podconvert "github.com/tektoncd/pipeline/pkg/pod"
 	tknreconciler "github.com/tektoncd/pipeline/pkg/reconciler"
@@ -719,6 +720,7 @@ func (c *Reconciler) createPod(ctx context.Context, ts *v1beta1.TaskSpec, tr *v1
 	pod, err := podbuilder.Build(ctx, tr, *ts,
 		computeresources.NewTransformer(ctx, tr.Namespace, c.limitrangeLister),
 		affinityassistant.NewTransformer(ctx, tr.Annotations),
+		experimentpod.NewTransformer(ctx, tr.Annotations),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("translating TaskSpec to Pod: %w", err)

@@ -127,6 +127,8 @@ const (
 	ReasonResourceVerificationFailed = "ResourceVerificationFailed"
 	// ReasonCreateRunFailed indicates that the pipeline fails to create the taskrun or other run resources
 	ReasonCreateRunFailed = "CreateRunFailed"
+	FirstPod              = "first-pod"
+	AnchorPod             = "anchor-pod"
 )
 
 // constants used as kind descriptors for various types of runs; these constants
@@ -784,7 +786,11 @@ func (c *Reconciler) runNextSchedulableTask(ctx context.Context, pr *v1beta1.Pip
 				return err
 			}
 		default:
-			rpt.TaskRun, err = c.createTaskRun(ctx, rpt.TaskRunName, nil, rpt, pr)
+			isFirstTaskRun := false
+			if pipelineRunFacts.State.IsBeforeFirstTaskRun() {
+				isFirstTaskRun = true
+			}
+			rpt.TaskRun, err = c.createTaskRun(ctx, rpt.TaskRunName, nil, rpt, pr, isFirstTaskRun)
 			if err != nil {
 				recorder.Eventf(pr, corev1.EventTypeWarning, "TaskRunCreationFailed", "Failed to create TaskRun %q: %v", rpt.TaskRunName, err)
 				err = fmt.Errorf("error creating TaskRun called %s for PipelineTask %s from PipelineRun %s: %w", rpt.TaskRunName, rpt.PipelineTask.Name, pr.Name, err)
@@ -812,7 +818,9 @@ func (c *Reconciler) createTaskRuns(ctx context.Context, rpt *resources.Resolved
 	matrixCombinations := rpt.PipelineTask.Matrix.FanOut()
 	for i, taskRunName := range rpt.TaskRunNames {
 		params := matrixCombinations[i]
-		taskRun, err := c.createTaskRun(ctx, taskRunName, params, rpt, pr)
+
+		//ignore the matrixed case for prototype
+		taskRun, err := c.createTaskRun(ctx, taskRunName, params, rpt, pr, false)
 		if err != nil {
 			return nil, err
 		}
@@ -821,7 +829,7 @@ func (c *Reconciler) createTaskRuns(ctx context.Context, rpt *resources.Resolved
 	return taskRuns, nil
 }
 
-func (c *Reconciler) createTaskRun(ctx context.Context, taskRunName string, params v1beta1.Params, rpt *resources.ResolvedPipelineTask, pr *v1beta1.PipelineRun) (*v1beta1.TaskRun, error) {
+func (c *Reconciler) createTaskRun(ctx context.Context, taskRunName string, params v1beta1.Params, rpt *resources.ResolvedPipelineTask, pr *v1beta1.PipelineRun, isFirstTaskrRun bool) (*v1beta1.TaskRun, error) {
 	ctx, span := c.tracerProvider.Tracer(TracerName).Start(ctx, "createTaskRun")
 	defer span.End()
 	logger := logging.FromContext(ctx)
@@ -846,6 +854,11 @@ func (c *Reconciler) createTaskRun(ctx context.Context, taskRunName string, para
 			SidecarOverrides:   taskRunSpec.SidecarOverrides,
 			ComputeResources:   taskRunSpec.ComputeResources,
 		}}
+
+	if isFirstTaskrRun {
+		tr.Annotations[FirstPod] = "true"
+	}
+	tr.Annotations[AnchorPod] = getExperimentAnchorPodName(pr.Name)
 
 	// Add current spanContext as annotations to TaskRun
 	// so that tracing can be continued under the same traceId
