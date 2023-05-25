@@ -851,7 +851,7 @@ func applyVolumeClaimTemplates(workspaceBindings []v1beta1.WorkspaceBinding, own
 			Name:    wb.Name,
 			SubPath: wb.SubPath,
 			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-				ClaimName: volumeclaim.GetPersistentVolumeClaimName(wb.VolumeClaimTemplate, wb, owner),
+				ClaimName: volumeclaim.GetPersistentVolumeClaimName(wb.VolumeClaimTemplate.Name, wb, owner),
 			},
 		}
 		taskRunWorkspaceBindings = append(taskRunWorkspaceBindings, b)

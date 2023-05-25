@@ -89,7 +89,7 @@ func getPersistentVolumeClaims(workspaceBindings []v1beta1.WorkspaceBinding, own
 		}
 
 		claim := workspaceBinding.VolumeClaimTemplate.DeepCopy()
-		claim.Name = GetPersistentVolumeClaimName(workspaceBinding.VolumeClaimTemplate, workspaceBinding, ownerReference)
+		claim.Name = GetPersistentVolumeClaimName(workspaceBinding.VolumeClaimTemplate.Name, workspaceBinding, ownerReference)
 		claim.Namespace = namespace
 		claim.OwnerReferences = []metav1.OwnerReference{ownerReference}
 		claims[workspaceBinding.Name] = claim
@@ -102,11 +102,11 @@ func getPersistentVolumeClaims(workspaceBindings []v1beta1.WorkspaceBinding, own
 // workspaceBinding name and ownerReference UID - because it is first used for creating a PVC and later,
 // possibly several TaskRuns to lookup the PVC to mount.
 // We use ownerReference UID over ownerReference name to distinguish runs with the same name.
-func GetPersistentVolumeClaimName(claim *corev1.PersistentVolumeClaim, wb v1beta1.WorkspaceBinding, owner metav1.OwnerReference) string {
-	if claim.Name == "" {
+func GetPersistentVolumeClaimName(claimName string, wb v1beta1.WorkspaceBinding, owner metav1.OwnerReference) string {
+	if claimName == "" {
 		return fmt.Sprintf("%s-%s", "pvc", getPersistentVolumeClaimIdentity(wb.Name, string(owner.UID)))
 	}
-	return fmt.Sprintf("%s-%s", claim.Name, getPersistentVolumeClaimIdentity(wb.Name, string(owner.UID)))
+	return fmt.Sprintf("%s-%s", claimName, getPersistentVolumeClaimIdentity(wb.Name, string(owner.UID)))
 }
 
 func getPersistentVolumeClaimIdentity(workspaceName, ownerName string) string {
