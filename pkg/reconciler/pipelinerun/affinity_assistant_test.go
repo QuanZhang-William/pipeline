@@ -135,7 +135,7 @@ func TestCreateAndDeleteOfAffinityAssistant(t *testing.T) {
 				Images:        pipeline.Images{},
 			}
 
-			err := c.createOrUpdateAffinityAssistants(ctx, tc.pr.Spec.Workspaces, tc.pr, tc.pr.Namespace)
+			err := c.createOrUpdateAffinityAssistantsPerWorkspace(ctx, tc.pr.Spec.Workspaces, tc.pr, tc.pr.Namespace)
 			if err != nil {
 				t.Errorf("unexpected error from createOrUpdateAffinityAssistants: %v", err)
 			}
@@ -291,7 +291,7 @@ func TestCreateOrUpdateAffinityAssistantWhenNodeIsCordoned(t *testing.T) {
 					})
 			}
 
-			err := c.createOrUpdateAffinityAssistants(ctx, testPipelineRun.Spec.Workspaces, testPipelineRun, testPipelineRun.Namespace)
+			err := c.createOrUpdateAffinityAssistantsPerWorkspace(ctx, testPipelineRun.Spec.Workspaces, testPipelineRun, testPipelineRun.Namespace)
 			if !tt.expectedError && err != nil {
 				t.Errorf("expected no error from createOrUpdateAffinityAssistants for the test \"%s\", but got: %v", tt.name, err)
 			}

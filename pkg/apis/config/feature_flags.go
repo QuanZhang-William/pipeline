@@ -42,6 +42,11 @@ const (
 	// IgnoreNoMatchPolicy is the value used for "trusted-resources-verification-no-match-policy" to skip verification
 	// when no matching policies are found
 	IgnoreNoMatchPolicy = "ignore"
+	// CosheduleWorkspaces is the value used for "coscheduling" to schedule PipelineTask Pods sharing the same PVC workspaces
+	// to the same node
+	CoscheduleWorkspaces = "coschedule-workspaces"
+	// CoshedulePipelineRuns is the value used for "coscheduling" to schedule PipelineTask Pods to the same node
+	CoschedulePipelineRuns = "coschedule-pipelineruns"
 	// ResultExtractionMethodTerminationMessage is the value used for "results-from" as a way to extract results from tasks using kubernetes termination message.
 	ResultExtractionMethodTerminationMessage = "termination-message"
 	// ResultExtractionMethodSidecarLogs is the value used for "results-from" as a way to extract results from tasks using sidecar logs.
@@ -76,6 +81,8 @@ const (
 	DefaultResultExtractionMethod = ResultExtractionMethodTerminationMessage
 	// DefaultMaxResultSize is the default value in bytes for the size of a result
 	DefaultMaxResultSize = 4096
+	// DefaultMaxResultSize is the default value in bytes for the size of a result
+	DefaultCoscheduling = CoscheduleWorkspaces
 
 	disableAffinityAssistantKey         = "disable-affinity-assistant"
 	disableCredsInitKey                 = "disable-creds-init"
@@ -90,6 +97,7 @@ const (
 	enableProvenanceInStatus            = "enable-provenance-in-status"
 	resultExtractionMethod              = "results-from"
 	maxResultSize                       = "max-result-size"
+	coschedulingKey                     = "coscheduling"
 )
 
 // DefaultFeatureFlags holds all the default configurations for the feature flags configmap.
@@ -119,6 +127,7 @@ type FeatureFlags struct {
 	EnableProvenanceInStatus  bool
 	ResultExtractionMethod    string
 	MaxResultSize             int
+	Coscheduling              string
 }
 
 // GetFeatureFlagsConfigName returns the name of the configmap containing all
@@ -182,6 +191,9 @@ func NewFeatureFlagsFromMap(cfgMap map[string]string) (*FeatureFlags, error) {
 	if err := setEnforceNonFalsifiability(cfgMap, tc.EnableAPIFields, &tc.EnforceNonfalsifiability); err != nil {
 		return nil, err
 	}
+	if err := setCoscheduling(cfgMap, DefaultCoscheduling, &tc.Coscheduling); err != nil {
+		return nil, err
+	}
 
 	// Given that they are alpha features, Tekton Bundles and Custom Tasks should be switched on if
 	// enable-api-fields is "alpha". If enable-api-fields is not "alpha" then fall back to the value of
@@ -211,6 +223,20 @@ func setEnabledAPIFields(cfgMap map[string]string, defaultValue string, feature 
 		*feature = value
 	default:
 		return fmt.Errorf("invalid value for feature flag %q: %q", enableAPIFields, value)
+	}
+	return nil
+}
+
+func setCoscheduling(cfgMap map[string]string, defaultValue string, feature *string) error {
+	value := defaultValue
+	if cfg, ok := cfgMap[coschedulingKey]; ok {
+		value = strings.ToLower(cfg)
+	}
+	switch value {
+	case CoscheduleWorkspaces, CoschedulePipelineRuns:
+		*feature = value
+	default:
+		return fmt.Errorf("invalid value for feature flag %q: %q", coschedulingKey, value)
 	}
 	return nil
 }

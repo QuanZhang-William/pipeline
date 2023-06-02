@@ -33,6 +33,7 @@ import (
 	pipelinerunreconciler "github.com/tektoncd/pipeline/pkg/client/injection/reconciler/pipeline/v1beta1/pipelinerun"
 	alpha1listers "github.com/tektoncd/pipeline/pkg/client/listers/pipeline/v1alpha1"
 	listers "github.com/tektoncd/pipeline/pkg/client/listers/pipeline/v1beta1"
+	"github.com/tektoncd/pipeline/pkg/internal/affinityassistant"
 	resolutionutil "github.com/tektoncd/pipeline/pkg/internal/resolution"
 	"github.com/tektoncd/pipeline/pkg/pipelinerunmetrics"
 	tknreconciler "github.com/tektoncd/pipeline/pkg/reconciler"
@@ -596,26 +597,30 @@ func (c *Reconciler) reconcile(ctx context.Context, pr *v1beta1.PipelineRun, get
 			return controller.NewPermanentError(err)
 		}
 
-		// Make an attempt to create Affinity Assistant if it does not exist
+		// make an attempt to create Affinity Assistant if it does not exist
 		// if the Affinity Assistant already exists, handle the possibility of assigned node becoming unschedulable by deleting the pod
-		if !c.isAffinityAssistantDisabled(ctx) {
-			// create Affinity Assistant (StatefulSet) so that taskRun pods that share workspace PVC achieve Node Affinity
-			if err = c.createOrUpdateAffinityAssistants(ctx, pr.Spec.Workspaces, pr, pr.Namespace); err != nil {
+		switch affinityassistant.GetAffinityAssistantBehavior(ctx) {
+		case affinityassistant.AffinityAssistantDisabled:
+			if pr.HasVolumeClaimTemplate() {
+				// create workspace PVC from template
+				if err = c.pvcHandler.CreatePersistentVolumeClaimsForWorkspaces(ctx, pr.Spec.Workspaces, *kmeta.NewControllerRef(pr), pr.Namespace); err != nil {
+					logger.Errorf("Failed to create PVC for PipelineRun %s: %v", pr.Name, err)
+					pr.Status.MarkFailed(volumeclaim.ReasonCouldntCreateWorkspacePVC,
+						"Failed to create PVC for PipelineRun %s/%s Workspaces correctly: %s",
+						pr.Namespace, pr.Name, err)
+					return controller.NewPermanentError(err)
+				}
+			}
+		case affinityassistant.AffinityAssistantPerWorkspace:
+			if err = c.createOrUpdateAffinityAssistantsPerWorkspace(ctx, pr.Spec.Workspaces, pr, pr.Namespace); err != nil {
 				logger.Errorf("Failed to create affinity assistant StatefulSet for PipelineRun %s: %v", pr.Name, err)
-				pr.Status.MarkFailed(ReasonCouldntCreateOrUpdateAffinityAssistantStatefulSet,
+				pr.Status.MarkFailed(ReasonCouldntCreateOrUpdateAffinityAssistantStatefulSetPerWorkspace,
 					"Failed to create StatefulSet for PipelineRun %s/%s correctly: %s",
 					pr.Namespace, pr.Name, err)
 				return controller.NewPermanentError(err)
 			}
-		} else if pr.HasVolumeClaimTemplate() {
-			// create workspace PVC from template
-			if err = c.pvcHandler.CreatePersistentVolumeClaimsForWorkspaces(ctx, pr.Spec.Workspaces, *kmeta.NewControllerRef(pr), pr.Namespace); err != nil {
-				logger.Errorf("Failed to create PVC for PipelineRun %s: %v", pr.Name, err)
-				pr.Status.MarkFailed(volumeclaim.ReasonCouldntCreateWorkspacePVC,
-					"Failed to create PVC for PipelineRun %s/%s Workspaces correctly: %s",
-					pr.Namespace, pr.Name, err)
-				return controller.NewPermanentError(err)
-			}
+		case affinityassistant.AffinityAssistantPerPipelineRun:
+			//TODO
 		}
 	}
 
