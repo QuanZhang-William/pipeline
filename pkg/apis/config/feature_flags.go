@@ -42,6 +42,14 @@ const (
 	// IgnoreNoMatchPolicy is the value used for "trusted-resources-verification-no-match-policy" to skip verification
 	// when no matching policies are found
 	IgnoreNoMatchPolicy = "ignore"
+	// CosheduleWorkspaces is the value used for "coscheduling" to coschedule PipelineRun Pods sharing the same PVC workspaces to the same node
+	CoscheduleWorkspaces = "coschedule-workspaces"
+	// CoshedulePipelineRuns is the value used for "coscheduling" to coschedule PipelineRun Pods to the same node
+	CoschedulePipelineRuns = "coschedule-pipelineruns"
+	// CoshedulePipelineRuns is the value used for "coscheduling" to coschedule PipelineRun Pods to the same node, and only allows one PipelineRun to run on a node at a time
+	CoscheduleIsolatePipelineRuns = "isolate-pipelineruns"
+	// CoscheduleDisabled is the value used for "coscheduling" to disabled PipelineRun Pods coscheduling
+	CoscheduleDisabled = "disabled"
 	// ResultExtractionMethodTerminationMessage is the value used for "results-from" as a way to extract results from tasks using kubernetes termination message.
 	ResultExtractionMethodTerminationMessage = "termination-message"
 	// ResultExtractionMethodSidecarLogs is the value used for "results-from" as a way to extract results from tasks using sidecar logs.
@@ -76,6 +84,8 @@ const (
 	DefaultResultExtractionMethod = ResultExtractionMethodTerminationMessage
 	// DefaultMaxResultSize is the default value in bytes for the size of a result
 	DefaultMaxResultSize = 4096
+	// DefaultCoscheduling is the default value for coscheduling
+	DefaultCoscheduling = CoscheduleDisabled
 
 	disableAffinityAssistantKey         = "disable-affinity-assistant"
 	disableCredsInitKey                 = "disable-creds-init"
@@ -90,6 +100,7 @@ const (
 	enableProvenanceInStatus            = "enable-provenance-in-status"
 	resultExtractionMethod              = "results-from"
 	maxResultSize                       = "max-result-size"
+	coschedulingKey                     = "coscheduling"
 )
 
 // DefaultFeatureFlags holds all the default configurations for the feature flags configmap.
@@ -119,6 +130,7 @@ type FeatureFlags struct {
 	EnableProvenanceInStatus  bool
 	ResultExtractionMethod    string
 	MaxResultSize             int
+	Coscheduling              string
 }
 
 // GetFeatureFlagsConfigName returns the name of the configmap containing all
@@ -182,6 +194,9 @@ func NewFeatureFlagsFromMap(cfgMap map[string]string) (*FeatureFlags, error) {
 	if err := setEnforceNonFalsifiability(cfgMap, tc.EnableAPIFields, &tc.EnforceNonfalsifiability); err != nil {
 		return nil, err
 	}
+	if err := setCoscheduling(cfgMap, DefaultCoscheduling, tc.EnableAPIFields, tc.DisableAffinityAssistant, &tc.Coscheduling); err != nil {
+		return nil, err
+	}
 
 	// Given that they are alpha features, Tekton Bundles and Custom Tasks should be switched on if
 	// enable-api-fields is "alpha". If enable-api-fields is not "alpha" then fall back to the value of
@@ -212,6 +227,29 @@ func setEnabledAPIFields(cfgMap map[string]string, defaultValue string, feature 
 	default:
 		return fmt.Errorf("invalid value for feature flag %q: %q", enableAPIFields, value)
 	}
+	return nil
+}
+
+// setCoscheduling sets the "coscheduling" flag based on the content of a given map.
+// If the feature gate is invalid or incompatible with `disable-affinity-assistant`, then an error is returned.
+func setCoscheduling(cfgMap map[string]string, defaultValue, enableAPIFields string, disabledAffinityAssistant bool, feature *string) error {
+	value := defaultValue
+	if cfg, ok := cfgMap[coschedulingKey]; ok {
+		value = strings.ToLower(cfg)
+	}
+
+	switch value {
+	case CoscheduleDisabled, CoscheduleWorkspaces, CoschedulePipelineRuns, CoscheduleIsolatePipelineRuns:
+		// validate that "coscheduling" is compatible with "disabled-affinity-assistant"
+		// "coscheduling" must be set to "disabled" when "disabled-affinity-assistant" is false
+		if !disabledAffinityAssistant && *feature != CoscheduleDisabled {
+			return fmt.Errorf("coscheduling value %v is incompatible with %v setting to false", value, disableAffinityAssistantKey)
+		}
+		*feature = value
+	default:
+		return fmt.Errorf("invalid value for feature flag %q: %q", coschedulingKey, value)
+	}
+
 	return nil
 }
 

@@ -30,6 +30,17 @@ data:
   # https://github.com/tektoncd/pipeline/blob/main/docs/workspaces.md#affinity-assistant-and-specifying-workspace-order-in-a-pipeline
   # or https://github.com/tektoncd/pipeline/pull/2630 for more info.
   disable-affinity-assistant: "false"
+  # Setting this flag will determine how PipelineRun Pods are scheduled with Affinity Assistant.
+  # Acceptable values are "disabled" (default), "coschedule-workspaces", "coschedule-pipelineruns", or "isolate-pipelineruns".
+  #
+  # See more in the "Configuration" section of tep-0135: coscheduling-pipelinerun-pods for more info about the options:
+  # https://github.com/tektoncd/community/blob/main/teps/0135-coscheduling-pipelinerun-pods.md#configuration
+  # See more in the "Upgrade and Migration Strategy" section of tep-0135: coscheduling-pipelinerun-pods for more info about
+  # migration strategy against the "disable-affinity-assistant" field:
+  # https://github.com/tektoncd/community/blob/main/teps/0135-coscheduling-pipelinerun-pods.md#upgrade-and-migration-strategy
+
+  # NOTE: this feature flag is WIP and DO NOT change the value.
+  coscheduling: "invalid"
   # Setting this flag to "true" will prevent Tekton scanning attached
   # service accounts and injecting any credentials it finds into your
   # Steps.
