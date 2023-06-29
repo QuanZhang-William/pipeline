@@ -19,7 +19,6 @@ package pipelinerun
 import (
 	"context"
 	"errors"
-	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -29,9 +28,11 @@ import (
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/pod"
 	v1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
 	aa "github.com/tektoncd/pipeline/pkg/internal/affinityassistant"
+	"github.com/tektoncd/pipeline/pkg/reconciler/volumeclaim"
 	"github.com/tektoncd/pipeline/pkg/workspace"
 	"github.com/tektoncd/pipeline/test/diff"
 	"github.com/tektoncd/pipeline/test/parse"
+	"go.uber.org/zap"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -168,7 +169,7 @@ func TestCreateAndDeleteOfAffinityAssistantPerPipelineRun(t *testing.T) {
 				KubeClientSet: fakek8s.NewSimpleClientset(),
 			}
 
-			err := c.createOrUpdateAffinityAssistantsPerAABehavior(ctx, tc.pr, aa.AffinityAssistantPerPipelineRun)
+			err := c.createOrUpdateAffinityAssistantsAndPVCsPerAABehavior(ctx, tc.pr, aa.AffinityAssistantPerPipelineRun)
 			if err != nil {
 				t.Errorf("unexpected error from createOrUpdateAffinityAssistantsPerPipelineRun: %v", err)
 			}
@@ -184,14 +185,16 @@ func TestCreateAndDeleteOfAffinityAssistantPerPipelineRun(t *testing.T) {
 
 // TestCreateAndDeleteOfAffinityAssistantPerWorkspace tests to create and delete an Affinity Assistant
 // per workspace for a given PipelineRun
-func TestCreateAndDeleteOfAffinityAssistantPerWorkspace(t *testing.T) {
+func TestCreateAndDeleteOfAffinityAssistantPerWorkspaceOrDisabled(t *testing.T) {
 	tests := []struct {
-		name                  string
+		name, expectedPVCName string
 		pr                    *v1.PipelineRun
 		expectStatefulSetSpec []*appsv1.StatefulSetSpec
+		aaBehavior            aa.AffinityAssitantBehavior
 	}{{
-		name: "PersistentVolumeClaim Workspace type",
-		pr:   testPRWithPVC,
+		name:       "PersistentVolumeClaim Workspace type",
+		aaBehavior: aa.AffinityAssistantPerWorkspace,
+		pr:         testPRWithPVC,
 		expectStatefulSetSpec: []*appsv1.StatefulSetSpec{{
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
@@ -205,20 +208,43 @@ func TestCreateAndDeleteOfAffinityAssistantPerWorkspace(t *testing.T) {
 			},
 		}},
 	}, {
-		name: "VolumeClaimTemplate Workspace type",
-		pr:   testPRWithVolumeClaimTemplate,
+		name:            "VolumeClaimTemplate Workspace type",
+		aaBehavior:      aa.AffinityAssistantPerWorkspace,
+		pr:              testPRWithVolumeClaimTemplate,
+		expectedPVCName: "pvc-b9eea16dce",
 		expectStatefulSetSpec: []*appsv1.StatefulSetSpec{{
-			VolumeClaimTemplates: []corev1.PersistentVolumeClaim{{
-				ObjectMeta: metav1.ObjectMeta{Name: "pvc-b9eea16dce"},
-			}},
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Volumes: []corev1.Volume{{
+						Name: "workspace-0",
+						VolumeSource: corev1.VolumeSource{
+							PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "pvc-b9eea16dce"},
+						},
+					}},
+				},
+			},
 		}},
 	}, {
-		name: "VolumeClaimTemplate and PersistentVolumeClaim Workspaces",
-		pr:   testPRWithVolumeClaimTemplateAndPVC,
+		name:            "VolumeClaimTemplate Workspace type - AA disabled",
+		aaBehavior:      aa.AffinityAssistantDisabled,
+		pr:              testPRWithVolumeClaimTemplate,
+		expectedPVCName: "pvc-b9eea16dce",
+	}, {
+		name:            "VolumeClaimTemplate and PersistentVolumeClaim Workspaces",
+		aaBehavior:      aa.AffinityAssistantPerWorkspace,
+		pr:              testPRWithVolumeClaimTemplateAndPVC,
+		expectedPVCName: "pvc-b9eea16dce",
 		expectStatefulSetSpec: []*appsv1.StatefulSetSpec{{
-			VolumeClaimTemplates: []corev1.PersistentVolumeClaim{{
-				ObjectMeta: metav1.ObjectMeta{Name: "pvc-b9eea16dce"},
-			}}}, {
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Volumes: []corev1.Volume{{
+						Name: "workspace-0",
+						VolumeSource: corev1.VolumeSource{
+							PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "pvc-b9eea16dce"},
+						},
+					}},
+				},
+			}}, {
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					Volumes: []corev1.Volume{{
@@ -232,6 +258,7 @@ func TestCreateAndDeleteOfAffinityAssistantPerWorkspace(t *testing.T) {
 		}},
 	}, {
 		name:                  "other Workspace type",
+		aaBehavior:            aa.AffinityAssistantPerWorkspace,
 		pr:                    testPRWithEmptyDir,
 		expectStatefulSetSpec: nil,
 	}}
@@ -240,13 +267,15 @@ func TestCreateAndDeleteOfAffinityAssistantPerWorkspace(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
+			kubeClientSet := fakek8s.NewSimpleClientset()
 			c := Reconciler{
-				KubeClientSet: fakek8s.NewSimpleClientset(),
+				KubeClientSet: kubeClientSet,
+				pvcHandler:    volumeclaim.NewPVCHandler(kubeClientSet, zap.NewExample().Sugar()),
 			}
 
-			err := c.createOrUpdateAffinityAssistantsPerAABehavior(ctx, tc.pr, aa.AffinityAssistantPerWorkspace)
+			err := c.createOrUpdateAffinityAssistantsAndPVCsPerAABehavior(ctx, tc.pr, tc.aaBehavior)
 			if err != nil {
-				t.Errorf("unexpected error from createOrUpdateAffinityAssistantsPerWorkspace: %v", err)
+				t.Fatalf("unexpected error from createOrUpdateAffinityAssistantsPerWorkspace: %v", err)
 			}
 
 			// validate StatefulSets from Affinity Assistant
@@ -254,6 +283,14 @@ func TestCreateAndDeleteOfAffinityAssistantPerWorkspace(t *testing.T) {
 				if tc.expectStatefulSetSpec != nil {
 					expectAAName := getAffinityAssistantName(w.Name, tc.pr.Name)
 					validateStatefulSetSpec(t, ctx, c, expectAAName, tc.expectStatefulSetSpec[i])
+				}
+			}
+
+			// validate PVCs from VolumeClaimTemplate
+			if tc.expectedPVCName != "" {
+				_, err = c.KubeClientSet.CoreV1().PersistentVolumeClaims("").Get(ctx, tc.expectedPVCName, metav1.GetOptions{})
+				if err != nil {
+					t.Errorf("unexpected error when retrieving PVC: %v", err)
 				}
 			}
 
@@ -274,24 +311,6 @@ func TestCreateAndDeleteOfAffinityAssistantPerWorkspace(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-func TestCreateAndDeleteOfAffinityAssistantDisabled_Failure(t *testing.T) {
-	ctx := context.Background()
-	c := Reconciler{
-		KubeClientSet: fakek8s.NewSimpleClientset(),
-	}
-
-	wantErr := fmt.Errorf("unexpected Affinity Assistant behavior %s", aa.AffinityAssistantDisabled)
-
-	err := c.createOrUpdateAffinityAssistantsPerAABehavior(ctx, testPRWithPVC, aa.AffinityAssistantDisabled)
-	if err == nil {
-		t.Fatalf("expecting error: %v, but got nil", wantErr)
-	}
-
-	if diff := cmp.Diff(wantErr.Error(), err.Error()); diff != "" {
-		t.Errorf("expected error mismatch: %v", diff)
 	}
 }
 
@@ -398,7 +417,7 @@ func TestCreateOrUpdateAffinityAssistantWhenNodeIsCordoned(t *testing.T) {
 						return true, &corev1.Pod{}, errors.New("error listing/deleting pod")
 					})
 			}
-			err := c.createOrUpdateAffinityAssistantsPerAABehavior(ctx, testPRWithPVC, aa.AffinityAssistantPerWorkspace)
+			err := c.createOrUpdateAffinityAssistantsAndPVCsPerAABehavior(ctx, testPRWithPVC, aa.AffinityAssistantPerWorkspace)
 			if !tt.expectedError && err != nil {
 				t.Errorf("expected no error from createOrUpdateAffinityAssistantsPerWorkspace for the test \"%s\", but got: %v", tt.name, err)
 			}
@@ -642,14 +661,12 @@ func TestCleanupAffinityAssistants_Success(t *testing.T) {
 			ReadyReplicas: 1,
 		},
 	}}
-
 	expectedPVCName := getPersistentVolumeClaimNameWithAffinityAssistant(workspace.Name, pr.Name, workspace, *kmeta.NewControllerRef(pr))
 	pvc := []*corev1.PersistentVolumeClaim{{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: expectedPVCName,
 		}},
 	}
-
 	data := Data{
 		StatefulSets: aa,
 		PVCs:         pvc,
@@ -667,9 +684,11 @@ func TestCleanupAffinityAssistants_Success(t *testing.T) {
 	if !apierrors.IsNotFound(err) {
 		t.Errorf("expected a NotFound response of StatefulSet, got: %v", err)
 	}
+
+	//  the PVCs are NOT expected to be deleted at Affinity Assistant cleanup time
 	_, err = c.KubeClientSet.CoreV1().PersistentVolumeClaims(pr.Namespace).Get(ctx, expectedPVCName, metav1.GetOptions{})
-	if !apierrors.IsNotFound(err) {
-		t.Errorf("expected a NotFound response of PersistentVolumeClaims, got: %v", err)
+	if err != nil {
+		t.Errorf("unexpected err when getting PersistentVolumeClaims, err: %v", err)
 	}
 }
 
@@ -692,14 +711,9 @@ func TestCleanupAffinityAssistants_Failure(t *testing.T) {
 		func(action testing2.Action) (handled bool, ret runtime.Object, err error) {
 			return true, &corev1.NodeList{}, errors.New("error deleting statefulsets")
 		})
-	c.KubeClientSet.CoreV1().(*fake.FakeCoreV1).PrependReactor("delete", "persistentvolumeclaims",
-		func(action testing2.Action) (handled bool, ret runtime.Object, err error) {
-			return true, &corev1.Pod{}, errors.New("error deleting persistentvolumeclaims")
-		})
 
 	expectedErrs := errorutils.NewAggregate([]error{
 		errors.New("failed to delete StatefulSet affinity-assistant-e3b0c44298: error deleting statefulsets"),
-		errors.New("failed to delete PersistentVolumeClaim pvc-e3b0c44298-affinity-assistant-e3b0c44298-0: error deleting persistentvolumeclaims"),
 	})
 
 	errs := c.cleanupAffinityAssistants(ctx, pr)
