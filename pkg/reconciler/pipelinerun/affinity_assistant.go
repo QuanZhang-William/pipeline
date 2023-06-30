@@ -92,11 +92,9 @@ func (c *Reconciler) createOrUpdateAffinityAssistantsPerAABehavior(ctx context.C
 			errs = append(errs, err...)
 		}
 	case aa.AffinityAssistantPerPipelineRun, aa.AffinityAssistantPerPipelineRunWithIsolation:
-		if claims != nil || claimTemplates != nil {
-			aaName := getAffinityAssistantName("", pr.Name)
-			err := c.createOrUpdateAffinityAssistant(ctx, aaName, pr, claimTemplates, claims, unschedulableNodes)
-			errs = append(errs, err...)
-		}
+		aaName := getAffinityAssistantName("", pr.Name)
+		err := c.createOrUpdateAffinityAssistant(ctx, aaName, pr, claimTemplates, claims, unschedulableNodes)
+		errs = append(errs, err...)
 	case aa.AffinityAssistantDisabled:
 		return fmt.Errorf("unexpected Affinity Assistant behavior %v", aa.AffinityAssistantDisabled)
 	}
