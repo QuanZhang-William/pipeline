@@ -169,7 +169,7 @@ func TestCreateAndDeleteOfAffinityAssistantPerPipelineRun(t *testing.T) {
 				KubeClientSet: fakek8s.NewSimpleClientset(),
 			}
 
-			err := c.createOrUpdateAffinityAssistantsAndPVCsPerAABehavior(ctx, tc.pr, aa.AffinityAssistantPerPipelineRun)
+			err, _ := c.createOrUpdateAffinityAssistantsAndPVCsPerAABehavior(ctx, tc.pr, aa.AffinityAssistantPerPipelineRun)
 			if err != nil {
 				t.Errorf("unexpected error from createOrUpdateAffinityAssistantsPerPipelineRun: %v", err)
 			}
@@ -273,7 +273,7 @@ func TestCreateAndDeleteOfAffinityAssistantPerWorkspaceOrDisabled(t *testing.T) 
 				pvcHandler:    volumeclaim.NewPVCHandler(kubeClientSet, zap.NewExample().Sugar()),
 			}
 
-			err := c.createOrUpdateAffinityAssistantsAndPVCsPerAABehavior(ctx, tc.pr, tc.aaBehavior)
+			err, _ := c.createOrUpdateAffinityAssistantsAndPVCsPerAABehavior(ctx, tc.pr, tc.aaBehavior)
 			if err != nil {
 				t.Fatalf("unexpected error from createOrUpdateAffinityAssistantsPerWorkspace: %v", err)
 			}
@@ -417,7 +417,7 @@ func TestCreateOrUpdateAffinityAssistantWhenNodeIsCordoned(t *testing.T) {
 						return true, &corev1.Pod{}, errors.New("error listing/deleting pod")
 					})
 			}
-			err := c.createOrUpdateAffinityAssistantsAndPVCsPerAABehavior(ctx, testPRWithPVC, aa.AffinityAssistantPerWorkspace)
+			err, _ := c.createOrUpdateAffinityAssistantsAndPVCsPerAABehavior(ctx, testPRWithPVC, aa.AffinityAssistantPerWorkspace)
 			if !tt.expectedError && err != nil {
 				t.Errorf("expected no error from createOrUpdateAffinityAssistantsPerWorkspace for the test \"%s\", but got: %v", tt.name, err)
 			}

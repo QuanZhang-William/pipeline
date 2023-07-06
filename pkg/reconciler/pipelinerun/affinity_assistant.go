@@ -40,9 +40,9 @@ import (
 )
 
 const (
-	// ReasonCouldntCreateOrUpdateAffinityAssistantStatefulSetPerWorkspace indicates that a PipelineRun uses workspaces with PersistentVolumeClaim
+	// ReasonCouldntCreateOrUpdateAffinityAssistantStatefulSet indicates that a PipelineRun uses workspaces with PersistentVolumeClaim
 	// as a volume source and expect an Assistant StatefulSet in AffinityAssistantPerWorkspace behavior, but couldn't create a StatefulSet.
-	ReasonCouldntCreateOrUpdateAffinityAssistantStatefulSetPerWorkspace = "ReasonCouldntCreateOrUpdateAffinityAssistantStatefulSetPerWorkspace"
+	ReasonCouldntCreateOrUpdateAffinityAssistantStatefulSet = "ReasonCouldntCreateOrUpdateAffinityAssistantStatefulSet"
 
 	featureFlagDisableAffinityAssistantKey = "disable-affinity-assistant"
 )
@@ -53,7 +53,7 @@ const (
 // every taskrun in the pipelinerun that use the same PVC based volume.
 // If the AffinityAssitantBehavior is AffinityAssistantPerPipelineRun or AffinityAssistantPerPipelineRunWithIsolation,
 // it creates one Affinity Assistant for the pipelinerun.
-func (c *Reconciler) createOrUpdateAffinityAssistantsAndPVCsPerAABehavior(ctx context.Context, pr *v1.PipelineRun, aaBehavior aa.AffinityAssitantBehavior) error {
+func (c *Reconciler) createOrUpdateAffinityAssistantsAndPVCsPerAABehavior(ctx context.Context, pr *v1.PipelineRun, aaBehavior aa.AffinityAssitantBehavior) (error, string) {
 	var errs []error
 	var unschedulableNodes sets.Set[string] = nil
 
@@ -82,7 +82,7 @@ func (c *Reconciler) createOrUpdateAffinityAssistantsAndPVCsPerAABehavior(ctx co
 	// affinity assistant so that the OwnerReference of the PVCs are the pipelineruns, which is used to achieve PVC auto deletion at PipelineRun deletion time
 	if (aaBehavior == aa.AffinityAssistantPerWorkspace || aaBehavior == aa.AffinityAssistantDisabled) && pr.HasVolumeClaimTemplate() {
 		if err := c.pvcHandler.CreatePVCsForWorkspacesWithoutAffinityAssistant(ctx, pr.Spec.Workspaces, *kmeta.NewControllerRef(pr), pr.Namespace); err != nil {
-			return fmt.Errorf("failed to create PVC for PipelineRun %s: %w", pr.Name, err)
+			return fmt.Errorf("failed to create PVC for PipelineRun %s: %w", pr.Name, err), volumeclaim.ReasonCouldntCreateWorkspacePVC
 		}
 	}
 
@@ -112,7 +112,12 @@ func (c *Reconciler) createOrUpdateAffinityAssistantsAndPVCsPerAABehavior(ctx co
 	case aa.AffinityAssistantDisabled:
 	}
 
-	return errorutils.NewAggregate(errs)
+	failReason := ""
+	if errs != nil {
+		failReason = ReasonCouldntCreateOrUpdateAffinityAssistantStatefulSet
+	}
+
+	return errorutils.NewAggregate(errs), failReason
 }
 
 // createOrUpdateAffinityAssistant creates an Affinity Assistant Statefulset with the provided affinityAssistantName and pipelinerun information.

@@ -610,25 +610,11 @@ func (c *Reconciler) reconcile(ctx context.Context, pr *v1.PipelineRun, getPipel
 			return controller.NewPermanentError(err)
 		}
 
-		switch aaBehavior {
-		case affinityassistant.AffinityAssistantPerWorkspace, affinityassistant.AffinityAssistantDisabled:
-			if err = c.createOrUpdateAffinityAssistantsAndPVCsPerAABehavior(ctx, pr, aaBehavior); err != nil {
-				logger.Errorf("Failed to create PVC or affinity assistant StatefulSet for PipelineRun %s: %v", pr.Name, err)
-				if aaBehavior == affinityassistant.AffinityAssistantPerWorkspace {
-					pr.Status.MarkFailed(ReasonCouldntCreateOrUpdateAffinityAssistantStatefulSetPerWorkspace,
-						"Failed to create StatefulSet for PipelineRun %s/%s correctly: %s",
-						pr.Namespace, pr.Name, err)
-				} else {
-					pr.Status.MarkFailed(volumeclaim.ReasonCouldntCreateWorkspacePVC,
-						"Failed to create PVC for PipelineRun %s/%s Workspaces correctly: %s",
-						pr.Namespace, pr.Name, err)
-				}
-
-				return controller.NewPermanentError(err)
-			}
-		case affinityassistant.AffinityAssistantPerPipelineRun, affinityassistant.AffinityAssistantPerPipelineRunWithIsolation:
-			// TODO(#6740)(WIP): implement end-to-end support for AffinityAssistantPerPipelineRun and AffinityAssistantPerPipelineRunWithIsolation modes
-			return controller.NewPermanentError(fmt.Errorf("affinity assistant behavior: %v is not implemented", aaBehavior))
+		if err, reason := c.createOrUpdateAffinityAssistantsAndPVCsPerAABehavior(ctx, pr, aaBehavior); err != nil {
+			logger.Errorf("Failed to create PVC or affinity assistant StatefulSet for PipelineRun %s: %v", pr.Name, err)
+			pr.Status.MarkFailed(reason,
+				"Failed to create PVC or StatefulSet for PipelineRun %s/%s correctly: %s",
+				pr.Namespace, pr.Name, err)
 		}
 	}
 
