@@ -103,14 +103,12 @@ func (c *Reconciler) createOrUpdateAffinityAssistantsAndPVCsPerAABehavior(ctx co
 			errs = append(errs, err...)
 		}
 	case aa.AffinityAssistantPerPipelineRun, aa.AffinityAssistantPerPipelineRunWithIsolation:
-		if claims != nil || claimTemplates != nil {
-			aaName := getAffinityAssistantName("", pr.Name)
-			// In AffinityAssistantPerPipelineRun or AffinityAssistantPerPipelineRunWithIsolation modes, the PVCs are created via StatefulSet for volume scheduling.
-			// PVCs from pipelinerun's VolumeClaimTemplate are enforced to be deleted at pipelinerun completion time,
-			// so we don't need to worry the OwnerReference of the PVCs
-			err := c.createOrUpdateAffinityAssistant(ctx, aaName, pr, claimTemplates, claims, unschedulableNodes)
-			errs = append(errs, err...)
-		}
+		aaName := getAffinityAssistantName("", pr.Name)
+		// In AffinityAssistantPerPipelineRun or AffinityAssistantPerPipelineRunWithIsolation modes, the PVCs are created via StatefulSet for volume scheduling.
+		// PVCs from pipelinerun's VolumeClaimTemplate are enforced to be deleted at pipelinerun completion time,
+		// so we don't need to worry the OwnerReference of the PVCs
+		err := c.createOrUpdateAffinityAssistant(ctx, aaName, pr, claimTemplates, claims, unschedulableNodes)
+		errs = append(errs, err...)
 	case aa.AffinityAssistantDisabled:
 	}
 
