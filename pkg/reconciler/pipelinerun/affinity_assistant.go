@@ -178,22 +178,33 @@ func (c *Reconciler) createOrUpdateAffinityAssistant(ctx context.Context, affini
 	return errs
 }
 
-// TODO(#6740)(WIP) implement cleanupAffinityAssistants for AffinityAssistantPerPipelineRun and AffinityAssistantPerPipelineRunWithIsolation affinity assistant modes
+// cleanupAffinityAssistants deletes affinity assistant StatefulSet
 func (c *Reconciler) cleanupAffinityAssistants(ctx context.Context, pr *v1.PipelineRun) error {
-	// omit cleanup if the feature is disabled
-	if c.isAffinityAssistantDisabled(ctx) {
-		return nil
+	aaBehavior, err := aa.GetAffinityAssistantBehavior(ctx)
+	if err != nil {
+		return err
 	}
 
 	var errs []error
-	for _, w := range pr.Spec.Workspaces {
-		if w.PersistentVolumeClaim != nil || w.VolumeClaimTemplate != nil {
-			affinityAssistantStsName := getAffinityAssistantName(w.Name, pr.Name)
-			if err := c.KubeClientSet.AppsV1().StatefulSets(pr.Namespace).Delete(ctx, affinityAssistantStsName, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
-				errs = append(errs, fmt.Errorf("failed to delete StatefulSet %s: %w", affinityAssistantStsName, err))
+	switch aaBehavior {
+	case aa.AffinityAssistantPerWorkspace:
+		for _, w := range pr.Spec.Workspaces {
+			if w.PersistentVolumeClaim != nil || w.VolumeClaimTemplate != nil {
+				affinityAssistantStsName := getAffinityAssistantName(w.Name, pr.Name)
+				if err := c.KubeClientSet.AppsV1().StatefulSets(pr.Namespace).Delete(ctx, affinityAssistantStsName, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+					errs = append(errs, fmt.Errorf("failed to delete StatefulSet %s: %w", affinityAssistantStsName, err))
+				}
 			}
 		}
+	case aa.AffinityAssistantPerPipelineRun, aa.AffinityAssistantPerPipelineRunWithIsolation:
+		affinityAssistantStsName := getAffinityAssistantName("", pr.Name)
+		if err := c.KubeClientSet.AppsV1().StatefulSets(pr.Namespace).Delete(ctx, affinityAssistantStsName, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+			errs = append(errs, fmt.Errorf("failed to delete StatefulSet %s: %w", affinityAssistantStsName, err))
+		}
+	case aa.AffinityAssistantDisabled:
+		return nil
 	}
+
 	return errorutils.NewAggregate(errs)
 }
 
@@ -319,17 +330,6 @@ func affinityAssistantStatefulSet(name string, pr *v1.PipelineRun, claimTemplate
 			},
 		},
 	}
-}
-
-// isAffinityAssistantDisabled returns a bool indicating whether an Affinity Assistant should
-// be created for each PipelineRun that use workspaces with PersistentVolumeClaims
-// as volume source. The default behaviour is to enable the Affinity Assistant to
-// provide Node Affinity for TaskRuns that share a PVC workspace.
-//
-// TODO(#6740)(WIP): replace this function with GetAffinityAssistantBehavior
-func (c *Reconciler) isAffinityAssistantDisabled(ctx context.Context) bool {
-	cfg := config.FromContextOrDefaults(ctx)
-	return cfg.FeatureFlags.DisableAffinityAssistant
 }
 
 // getAssistantAffinityMergedWithPodTemplateAffinity return the affinity that merged with PipelineRun PodTemplate affinity.

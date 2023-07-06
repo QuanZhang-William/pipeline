@@ -754,53 +754,6 @@ func TestThatCleanupIsAvoidedIfAssistantIsDisabled(t *testing.T) {
 	}
 }
 
-func TestDisableAffinityAssistant(t *testing.T) {
-	for _, tc := range []struct {
-		description string
-		configMap   *corev1.ConfigMap
-		expected    bool
-	}{{
-		description: "Default behaviour: A missing disable-affinity-assistant flag should result in false",
-		configMap: &corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{Name: config.GetFeatureFlagsConfigName(), Namespace: system.Namespace()},
-			Data:       map[string]string{},
-		},
-		expected: false,
-	}, {
-		description: "Setting disable-affinity-assistant to false should result in false",
-		configMap: &corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{Name: config.GetFeatureFlagsConfigName(), Namespace: system.Namespace()},
-			Data: map[string]string{
-				featureFlagDisableAffinityAssistantKey: "false",
-			},
-		},
-		expected: false,
-	}, {
-		description: "Setting disable-affinity-assistant to true should result in true",
-		configMap: &corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{Name: config.GetFeatureFlagsConfigName(), Namespace: system.Namespace()},
-			Data: map[string]string{
-				featureFlagDisableAffinityAssistantKey: "true",
-			},
-		},
-		expected: true,
-	}} {
-		t.Run(tc.description, func(t *testing.T) {
-			c := Reconciler{
-				KubeClientSet: fakek8s.NewSimpleClientset(
-					tc.configMap,
-				),
-				Images: pipeline.Images{},
-			}
-			store := config.NewStore(logtesting.TestLogger(t))
-			store.OnConfigChanged(tc.configMap)
-			if result := c.isAffinityAssistantDisabled(store.ToContext(context.Background())); result != tc.expected {
-				t.Errorf("Expected %t Received %t", tc.expected, result)
-			}
-		})
-	}
-}
-
 func TestGetAssistantAffinityMergedWithPodTemplateAffinity(t *testing.T) {
 	assistantPodAffinityTerm := corev1.WeightedPodAffinityTerm{
 		Weight: 100,

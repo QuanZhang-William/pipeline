@@ -881,8 +881,20 @@ func (c *Reconciler) createTaskRun(ctx context.Context, taskRunName string, para
 		return nil, err
 	}
 
-	if !c.isAffinityAssistantDisabled(ctx) && pipelinePVCWorkspaceName != "" {
-		tr.Annotations[workspace.AnnotationAffinityAssistantName] = getAffinityAssistantName(pipelinePVCWorkspaceName, pr.Name)
+	aaBehavior, err := affinityassistant.GetAffinityAssistantBehavior(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	switch aaBehavior {
+	case affinityassistant.AffinityAssistantPerWorkspace:
+		if pipelinePVCWorkspaceName != "" {
+			tr.Annotations[workspace.AnnotationAffinityAssistantName] = getAffinityAssistantName(pipelinePVCWorkspaceName, pr.Name)
+		}
+	case affinityassistant.AffinityAssistantPerPipelineRun, affinityassistant.AffinityAssistantPerPipelineRunWithIsolation:
+		tr.Annotations[workspace.AnnotationAffinityAssistantName] = getAffinityAssistantName("", pr.Name)
+
+	case affinityassistant.AffinityAssistantDisabled:
 	}
 
 	logger.Infof("Creating a new TaskRun object %s for pipeline task %s", taskRunName, rpt.PipelineTask.Name)
@@ -987,10 +999,23 @@ func (c *Reconciler) createCustomRun(ctx context.Context, runName string, params
 			},
 		}
 	}
+
 	// Set the affinity assistant annotation in case the custom task creates TaskRuns or Pods
 	// that can take advantage of it.
-	if !c.isAffinityAssistantDisabled(ctx) && pipelinePVCWorkspaceName != "" {
-		r.Annotations[workspace.AnnotationAffinityAssistantName] = getAffinityAssistantName(pipelinePVCWorkspaceName, pr.Name)
+	aaBehavior, err := affinityassistant.GetAffinityAssistantBehavior(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	switch aaBehavior {
+	case affinityassistant.AffinityAssistantPerWorkspace:
+		if pipelinePVCWorkspaceName != "" {
+			r.Annotations[workspace.AnnotationAffinityAssistantName] = getAffinityAssistantName(pipelinePVCWorkspaceName, pr.Name)
+		}
+	case affinityassistant.AffinityAssistantPerPipelineRun, affinityassistant.AffinityAssistantPerPipelineRunWithIsolation:
+		r.Annotations[workspace.AnnotationAffinityAssistantName] = getAffinityAssistantName("", pr.Name)
+
+	case affinityassistant.AffinityAssistantDisabled:
 	}
 
 	logger.Infof("Creating a new CustomRun object %s", runName)
