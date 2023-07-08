@@ -85,12 +85,12 @@ func (c *Reconciler) createOrUpdateAffinityAssistantsAndPVCsPerAABehavior(ctx co
 			return fmt.Errorf("failed to create PVC for PipelineRun %s: %w", pr.Name, err), volumeclaim.ReasonCouldntCreateWorkspacePVC
 		}
 	}
-
+	affinityTerm := getAssistantAffinityMergedWithPodTemplateAffinity(pr, aaBehavior)
 	switch aaBehavior {
 	case aa.AffinityAssistantPerWorkspace:
 		for claim, workspaceName := range claimToWorkspace {
 			aaName := getAffinityAssistantName(workspaceName, pr.Name)
-			err := c.createOrUpdateAffinityAssistant(ctx, aaName, pr, nil, []corev1.PersistentVolumeClaimVolumeSource{*claim}, unschedulableNodes)
+			err := c.createOrUpdateAffinityAssistant(ctx, aaName, pr, nil, []corev1.PersistentVolumeClaimVolumeSource{*claim}, unschedulableNodes, affinityTerm)
 			errs = append(errs, err...)
 		}
 		for claimTemplate, workspaceName := range claimTemplatesToWorkspace {
@@ -99,7 +99,7 @@ func (c *Reconciler) createOrUpdateAffinityAssistantsAndPVCsPerAABehavior(ctx co
 			// In AffinityAssistantPerWorkspace mode, the reconciler has created PVCs (owned by pipelinerun) from pipelinerun's VolumeClaimTemplate at this point,
 			// so the VolumeClaimTemplates are pass in as PVCs when creating affinity assistant StatefulSet for volume scheduling.
 			// If passed in as VolumeClaimTemplates, the PVCs are owned by Affinity Assistant StatefulSet instead of the pipelinerun.
-			err := c.createOrUpdateAffinityAssistant(ctx, aaName, pr, nil, []corev1.PersistentVolumeClaimVolumeSource{{ClaimName: claimTemplate.Name}}, unschedulableNodes)
+			err := c.createOrUpdateAffinityAssistant(ctx, aaName, pr, nil, []corev1.PersistentVolumeClaimVolumeSource{{ClaimName: claimTemplate.Name}}, unschedulableNodes, affinityTerm)
 			errs = append(errs, err...)
 		}
 	case aa.AffinityAssistantPerPipelineRun, aa.AffinityAssistantPerPipelineRunWithIsolation:
@@ -107,7 +107,7 @@ func (c *Reconciler) createOrUpdateAffinityAssistantsAndPVCsPerAABehavior(ctx co
 		// In AffinityAssistantPerPipelineRun or AffinityAssistantPerPipelineRunWithIsolation modes, the PVCs are created via StatefulSet for volume scheduling.
 		// PVCs from pipelinerun's VolumeClaimTemplate are enforced to be deleted at pipelinerun completion time,
 		// so we don't need to worry the OwnerReference of the PVCs
-		err := c.createOrUpdateAffinityAssistant(ctx, aaName, pr, claimTemplates, claims, unschedulableNodes)
+		err := c.createOrUpdateAffinityAssistant(ctx, aaName, pr, claimTemplates, claims, unschedulableNodes, affinityTerm)
 		errs = append(errs, err...)
 	case aa.AffinityAssistantDisabled:
 	}
@@ -123,7 +123,7 @@ func (c *Reconciler) createOrUpdateAffinityAssistantsAndPVCsPerAABehavior(ctx co
 // createOrUpdateAffinityAssistant creates an Affinity Assistant Statefulset with the provided affinityAssistantName and pipelinerun information.
 // The VolumeClaimTemplates and Volumes of StatefulSet reference the resolved claimTemplates and claims respectively.
 // It maintains a set of unschedulableNodes to detect and recreate Affinity Assistant in case of the node is cordoned to avoid pipelinerun deadlock.
-func (c *Reconciler) createOrUpdateAffinityAssistant(ctx context.Context, affinityAssistantName string, pr *v1.PipelineRun, claimTemplates []corev1.PersistentVolumeClaim, claims []corev1.PersistentVolumeClaimVolumeSource, unschedulableNodes sets.Set[string]) []error {
+func (c *Reconciler) createOrUpdateAffinityAssistant(ctx context.Context, affinityAssistantName string, pr *v1.PipelineRun, claimTemplates []corev1.PersistentVolumeClaim, claims []corev1.PersistentVolumeClaimVolumeSource, unschedulableNodes sets.Set[string], affinity *corev1.Affinity) []error {
 	logger := logging.FromContext(ctx)
 	cfg := config.FromContextOrDefaults(ctx)
 
@@ -132,7 +132,7 @@ func (c *Reconciler) createOrUpdateAffinityAssistant(ctx context.Context, affini
 	switch {
 	// check whether the affinity assistant (StatefulSet) exists or not, create one if it does not exist
 	case apierrors.IsNotFound(err):
-		affinityAssistantStatefulSet := affinityAssistantStatefulSet(affinityAssistantName, pr, claimTemplates, claims, c.Images.NopImage, cfg.Defaults.DefaultAAPodTemplate)
+		affinityAssistantStatefulSet := affinityAssistantStatefulSet(affinityAssistantName, pr, claimTemplates, claims, c.Images.NopImage, affinity, cfg.Defaults.DefaultAAPodTemplate)
 		_, err := c.KubeClientSet.AppsV1().StatefulSets(pr.Namespace).Create(ctx, affinityAssistantStatefulSet, metav1.CreateOptions{})
 		if err != nil {
 			errs = append(errs, fmt.Errorf("failed to create StatefulSet %s: %w", affinityAssistantName, err))
@@ -245,7 +245,7 @@ func getStatefulSetLabels(pr *v1.PipelineRun, affinityAssistantName string) map[
 // affinityAssistantStatefulSet returns an Affinity Assistant as a StatefulSet with the given AffinityAssistantTemplate applied to the StatefulSet PodTemplateSpec.
 // The VolumeClaimTemplates and Volume of StatefulSet reference the PipelineRun WorkspaceBinding VolumeClaimTempalte and the PVCs respectively.
 // The PVs created by the StatefulSet are scheduled to the same availability zone which avoids PV scheduling conflict.
-func affinityAssistantStatefulSet(name string, pr *v1.PipelineRun, claimTemplates []corev1.PersistentVolumeClaim, claims []corev1.PersistentVolumeClaimVolumeSource, affinityAssistantImage string, defaultAATpl *pod.AffinityAssistantTemplate) *appsv1.StatefulSet {
+func affinityAssistantStatefulSet(name string, pr *v1.PipelineRun, claimTemplates []corev1.PersistentVolumeClaim, claims []corev1.PersistentVolumeClaimVolumeSource, affinityAssistantImage string, affinity *corev1.Affinity, defaultAATpl *pod.AffinityAssistantTemplate) *appsv1.StatefulSet {
 	// We want a singleton pod
 	replicas := int32(1)
 
@@ -327,7 +327,7 @@ func affinityAssistantStatefulSet(name string, pr *v1.PipelineRun, claimTemplate
 					NodeSelector:     tpl.NodeSelector,
 					ImagePullSecrets: tpl.ImagePullSecrets,
 
-					Affinity: getAssistantAffinityMergedWithPodTemplateAffinity(pr),
+					Affinity: affinity,
 					Volumes:  volumes,
 				},
 			},
@@ -336,20 +336,7 @@ func affinityAssistantStatefulSet(name string, pr *v1.PipelineRun, claimTemplate
 }
 
 // getAssistantAffinityMergedWithPodTemplateAffinity return the affinity that merged with PipelineRun PodTemplate affinity.
-func getAssistantAffinityMergedWithPodTemplateAffinity(pr *v1.PipelineRun) *corev1.Affinity {
-	// use podAntiAffinity to repel other affinity assistants
-	repelOtherAffinityAssistantsPodAffinityTerm := corev1.WeightedPodAffinityTerm{
-		Weight: 100,
-		PodAffinityTerm: corev1.PodAffinityTerm{
-			LabelSelector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{
-					workspace.LabelComponent: workspace.ComponentNameAffinityAssistant,
-				},
-			},
-			TopologyKey: "kubernetes.io/hostname",
-		},
-	}
-
+func getAssistantAffinityMergedWithPodTemplateAffinity(pr *v1.PipelineRun, aaBehavior aa.AffinityAssitantBehavior) *corev1.Affinity {
 	affinityAssistantsAffinity := &corev1.Affinity{}
 	if pr.Spec.TaskRunTemplate.PodTemplate != nil && pr.Spec.TaskRunTemplate.PodTemplate.Affinity != nil {
 		affinityAssistantsAffinity = pr.Spec.TaskRunTemplate.PodTemplate.Affinity
@@ -357,9 +344,30 @@ func getAssistantAffinityMergedWithPodTemplateAffinity(pr *v1.PipelineRun) *core
 	if affinityAssistantsAffinity.PodAntiAffinity == nil {
 		affinityAssistantsAffinity.PodAntiAffinity = &corev1.PodAntiAffinity{}
 	}
-	affinityAssistantsAffinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution =
-		append(affinityAssistantsAffinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
-			repelOtherAffinityAssistantsPodAffinityTerm)
+
+	RepelOtherAffinityAssistantsPodAffinityTerm := corev1.PodAffinityTerm{
+		LabelSelector: &metav1.LabelSelector{
+			MatchLabels: map[string]string{
+				workspace.LabelComponent: workspace.ComponentNameAffinityAssistant,
+			},
+		},
+		TopologyKey: "kubernetes.io/hostname",
+	}
+
+	if aaBehavior == aa.AffinityAssistantPerPipelineRunWithIsolation {
+		affinityAssistantsAffinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution =
+			append(affinityAssistantsAffinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+				RepelOtherAffinityAssistantsPodAffinityTerm)
+	} else {
+		// use podAntiAffinity to repel other affinity assistants
+		preferredRepelOtherAffinityAssistantsPodAffinityTerm := corev1.WeightedPodAffinityTerm{
+			Weight:          100,
+			PodAffinityTerm: RepelOtherAffinityAssistantsPodAffinityTerm,
+		}
+		affinityAssistantsAffinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution =
+			append(affinityAssistantsAffinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
+				preferredRepelOtherAffinityAssistantsPodAffinityTerm)
+	}
 
 	return affinityAssistantsAffinity
 }
