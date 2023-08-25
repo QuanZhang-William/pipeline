@@ -320,6 +320,9 @@ func (t *ResolvedPipelineTask) skipBecauseWhenExpressionsEvaluatedToFalse(facts 
 //	    if yes, it ignores this parent skip and continue evaluating other parent tasks
 //	    if no, it returns true to skip the current task because this parent task was skipped
 //	if no, it continues checking the other parent tasks
+
+// if any of the parent task is skipped NOT because of when expression, skip current, otherwise execute it
+// so there should be no change in this function
 func (t *ResolvedPipelineTask) skipBecauseParentTaskWasSkipped(facts *PipelineRunFacts) bool {
 	stateMap := facts.State.ToMap()
 	node := facts.TasksGraph.Nodes[t.PipelineTask.Name]
@@ -485,6 +488,8 @@ func ValidateTaskRunSpecs(p *v1.PipelineSpec, pr *v1.PipelineRun) error {
 
 // ResolvePipelineTask returns a new ResolvedPipelineTask representing any TaskRuns or CustomRuns
 // associated with this Pipeline Task, if they exist.
+//
+// # This function also applies the results generated from previous tasks to the current(taget) task
 //
 // If the Pipeline Task is a Task, it retrieves any TaskRuns, plus the Task spec, and updates the ResolvedPipelineTask
 // with this information. It also sets the ResolvedPipelineTask's TaskRunName(s) with the names of TaskRuns

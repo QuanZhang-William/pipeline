@@ -349,6 +349,9 @@ func (c *Reconciler) resolvePipelineState(
 			return r, nil
 		}
 
+		// this function resolves the local/remote pipelinetask
+		// applies the results from previous tasks to the target task
+		// and create new names for pipelinetask run?
 		resolvedTask, err := resources.ResolvePipelineTask(ctx,
 			*pr,
 			fn,
