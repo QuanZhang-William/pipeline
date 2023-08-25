@@ -1794,6 +1794,28 @@ map[string]string
 <div>
 <p>Params is a list of Param</p>
 </div>
+<h3 id="tekton.dev/v1.PipelineOnErrorType">PipelineOnErrorType
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#tekton.dev/v1.PipelineTask">PipelineTask</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;continue&#34;</p></td>
+<td><p>Continue indicates continue executing the rest of the pipeline irrespective of the status of the task run</p>
+</td>
+</tr><tr><td><p>&#34;stopAndFail&#34;</p></td>
+<td><p>StopAndFail indicates exit the pipeline run if the task run is failed</p>
+</td>
+</tr></tbody>
+</table>
 <h3 id="tekton.dev/v1.PipelineRef">PipelineRef
 </h3>
 <p>
@@ -2744,6 +2766,21 @@ Kubernetes meta/v1.Duration
 <em>(Optional)</em>
 <p>Time after which the TaskRun times out. Defaults to 1 hour.
 Refer Go&rsquo;s ParseDuration documentation for expected format: <a href="https://golang.org/pkg/time/#ParseDuration">https://golang.org/pkg/time/#ParseDuration</a></p>
+</td>
+</tr>
+<tr>
+<td>
+<code>onError</code><br/>
+<em>
+<a href="#tekton.dev/v1.PipelineOnErrorType">
+PipelineOnErrorType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>OnError defines the exiting behavior of a task on error
+can be set to [ continue | stopAndFail ]</p>
 </td>
 </tr>
 </tbody>
@@ -4745,6 +4782,9 @@ reasons that emerge from underlying resources are not included here</p>
 </td>
 </tr><tr><td><p>&#34;Failed&#34;</p></td>
 <td><p>TaskRunReasonFailed is the reason set when the TaskRun completed with a failure</p>
+</td>
+</tr><tr><td><p>&#34;FailureIgnored&#34;</p></td>
+<td><p>TaskRunReasonFailureIgnored is the reason set when the Taskrun has failed and the failure is ignored</p>
 </td>
 </tr><tr><td><p>&#34;TaskRunImagePullFailed&#34;</p></td>
 <td><p>TaskRunReasonImagePullFailed is the reason set when the step of a task fails due to image not being pulled</p>

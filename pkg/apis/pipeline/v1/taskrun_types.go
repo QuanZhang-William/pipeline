@@ -155,6 +155,8 @@ const (
 	TaskRunReasonResultLargerThanAllowedLimit TaskRunReason = "TaskRunResultLargerThanAllowedLimit"
 	// TaskRunReasonStopSidecarFailed indicates that the sidecar is not properly stopped.
 	TaskRunReasonStopSidecarFailed = "TaskRunStopSidecarFailed"
+	// TaskRunReasonFailureIgnored is the reason set when the Taskrun has failed and the failure is ignored
+	TaskRunReasonFailureIgnored TaskRunReason = "FailureIgnored"
 )
 
 func (t TaskRunReason) String() string {

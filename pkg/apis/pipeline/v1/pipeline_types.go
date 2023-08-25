@@ -228,7 +228,21 @@ type PipelineTask struct {
 	// Refer Go's ParseDuration documentation for expected format: https://golang.org/pkg/time/#ParseDuration
 	// +optional
 	Timeout *metav1.Duration `json:"timeout,omitempty"`
+
+	// OnError defines the exiting behavior of a task on error
+	// can be set to [ continue | stopAndFail ]
+	// +optional
+	OnError PipelineOnErrorType `json:"onError,omitempty"`
 }
+
+type PipelineOnErrorType string
+
+const (
+	// StopAndFail indicates exit the pipeline run if the task run is failed
+	PipelineStopAndFail PipelineOnErrorType = "stopAndFail"
+	// Continue indicates continue executing the rest of the pipeline irrespective of the status of the task run
+	PipelineContinue PipelineOnErrorType = "continue"
+)
 
 // IsCustomTask checks whether an embedded TaskSpec is a Custom Task
 func (et *EmbeddedTask) IsCustomTask() bool {
