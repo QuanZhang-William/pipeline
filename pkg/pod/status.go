@@ -132,7 +132,10 @@ func MakeTaskRunStatus(ctx context.Context, logger *zap.SugaredLogger, tr v1.Tas
 	complete := areStepsComplete(pod) || pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed
 
 	if complete {
-		updateCompletedTaskRunStatus(logger, trs, pod)
+		failureStrategy, ok := tr.Annotations["pipeline.tekton.dev/onerror"]
+		if ok {
+			updateCompletedTaskRunStatus(logger, trs, pod, failureStrategy)
+		}
 	} else {
 		updateIncompleteTaskRunStatus(trs, pod)
 	}
@@ -359,10 +362,14 @@ func extractExitCodeFromResults(results []result.RunResult) (*int32, error) {
 	return nil, nil //nolint:nilnil // would be more ergonomic to return a sentinel error
 }
 
-func updateCompletedTaskRunStatus(logger *zap.SugaredLogger, trs *v1.TaskRunStatus, pod *corev1.Pod) {
+func updateCompletedTaskRunStatus(logger *zap.SugaredLogger, trs *v1.TaskRunStatus, pod *corev1.Pod, ignoreFailure string) {
 	if DidTaskRunFail(pod) {
 		msg := getFailureMessage(logger, pod)
-		markStatusFailure(trs, v1.TaskRunReasonFailed.String(), msg)
+		if ignoreFailure == "continue" {
+			markStatusFailure(trs, v1.TaskRunReasonFailureIgnored.String(), msg)
+		} else {
+			markStatusFailure(trs, v1.TaskRunReasonFailed.String(), msg)
+		}
 	} else {
 		markStatusSuccess(trs)
 	}

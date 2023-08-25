@@ -254,7 +254,7 @@ func (state PipelineRunState) getNextTasks(candidateTasks sets.String) []*Resolv
 func (facts *PipelineRunFacts) IsStopping() bool {
 	for _, t := range facts.State {
 		if facts.isDAGTask(t.PipelineTask.Name) {
-			if t.isFailure() && t.PipelineTask.OnError == v1.PipelineContinue {
+			if t.isFailure() && t.PipelineTask.OnError == v1.PipelineStopAndFail {
 				return true
 			}
 		}

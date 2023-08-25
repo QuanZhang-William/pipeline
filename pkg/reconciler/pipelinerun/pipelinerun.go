@@ -891,6 +891,9 @@ func (c *Reconciler) createTaskRun(ctx context.Context, taskRunName string, para
 		tr.Annotations[workspace.AnnotationAffinityAssistantName] = aaAnnotationVal
 	}
 
+	// pass in the onError value to pipelinetaskrun
+	tr.Annotations["pipeline.tekton.dev/onerror"] = string(rpt.PipelineTask.OnError)
+
 	logger.Infof("Creating a new TaskRun object %s for pipeline task %s", taskRunName, rpt.PipelineTask.Name)
 	return c.PipelineClientSet.TektonV1().TaskRuns(pr.Namespace).Create(ctx, tr, metav1.CreateOptions{})
 }
