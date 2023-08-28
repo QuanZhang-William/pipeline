@@ -1,0 +1,49 @@
+## order dependency => task 1 fail, task 2 success, pipeline succeess
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  generateName: 2-task-order-dep-2nd-success
+spec:
+  pipelineSpec:
+    tasks:
+      - name: task1
+        onError: continue
+        taskSpec:
+          steps:
+            - name: step1
+              image: alpine
+              script: |
+                exit 1
+      - name: task2
+        runAfter: [task1]
+        taskSpec:
+          steps:
+            - name: step1
+              image: alpine
+              script: |
+                exit 0
+---
+## order dependency => task 1 fail, task 2 fail, pipeline fail
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  generateName: 2-task-order-dep-2nd-fail
+spec:
+  pipelineSpec:
+    tasks:
+      - name: task1
+        onError: continue
+        taskSpec:
+          steps:
+            - name: step1
+              image: alpine
+              script: |
+                exit 1
+      - name: task2
+        runAfter: [task1]
+        taskSpec:
+          steps:
+            - name: step1
+              image: alpine
+              script: |
+                exit 1

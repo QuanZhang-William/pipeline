@@ -1,0 +1,113 @@
+# regular task referring to a result not available
+# resource dependency task 1 fail Continue, task 2 normal 
+# task 2 not executed, not skipped, pipeline failed with InvalidTaskResultReference
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  generateName: 2-task-resource-dep-
+spec:
+  pipelineSpec:
+    tasks:
+      - name: task1
+        #onError: continue
+        taskSpec:
+          results:
+            - name: suffix
+          steps:
+            - name: step1
+              image: alpine
+              onError: continue
+              script: |
+                exit 1
+                echo -n "suffix" > $(results.suffix.path)
+            - name: step2
+              image: alpine
+              script: |
+                exit 1
+      - name: task2
+        taskSpec:
+          params:
+            - name: arg        
+          steps:
+            - name: step1
+              image: alpine
+              script: |
+                echo "$(params.arg)"
+        params:
+        - name: arg
+          value: "prefix:$(tasks.task1.results.suffix)"
+
+# ---
+# ## onError:continue task referring to a result not available
+# ## skip due to Results were missing
+# apiVersion: tekton.dev/v1beta1
+# kind: PipelineRun
+# metadata:
+#   generateName: 2-task-resource-dep-continue-
+# spec:
+#   pipelineSpec:
+#     tasks:
+#       - name: task1
+#         onError: continue
+#         taskSpec:
+#           results:
+#             - name: suffix
+#           steps:
+#             - name: step1
+#               image: alpine
+#               onError: continue
+#               script: |
+#                 echo -n "suffix" > $(results.suffix.path)
+#                 exit 1
+#             - name: step2
+#               image: alpine
+#               script: |
+#                 exit 1
+#       - name: task2
+#         onError: continue
+#         taskSpec:
+#           params:
+#             - name: arg        
+#           steps:
+#             - name: step1
+#               image: alpine
+#               script: |
+#                 echo "$(params.arg)"
+#         params:
+#         - name: arg
+#           value: "prefix:$(tasks.task1.results.suffix)"
+
+# ---
+## onError:continue task referring to a result not available
+## skip due to Results were missing
+# apiVersion: tekton.dev/v1beta1
+# kind: PipelineRun
+# metadata:
+#   generateName: 2-task-resource-dep-2-
+# spec:
+#   pipelineSpec:
+#     tasks:
+#       - name: task1
+#         onError: stopAndFail
+#         taskSpec:
+#           results:
+#             - name: suffix
+#           steps:
+#             - name: step1
+#               image: alpine
+#               script: |
+#                 echo -n "suffix" > $(results.suffix.path)
+#                 exit 1
+#       - name: task2
+#         onError: stopAndFail
+#         taskSpec:
+#           params:
+#             - name: arg        
+#           steps:
+#             - name: step1
+#               image: alpine
+#               script: |
+#                 echo "$(params.arg)"
+#         params:
+#         - name: arg
+#           value: "prefix:$(tasks.task1.results.suffix)"
