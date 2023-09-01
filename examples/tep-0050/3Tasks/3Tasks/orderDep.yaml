@@ -1,0 +1,35 @@
+# 3 tasks, first task failed with onError: continue
+## 2nd task executes successfully
+## 3nd task  executes successfully
+
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  generateName: order-dep-
+spec:
+  pipelineSpec:
+    tasks:
+      - name: task1
+        onError: continue
+        taskSpec:
+          steps:
+          - name: step1
+            image: alpine
+            script: |
+              exit 1
+      - name: task2
+        runAfter: [task1]
+        taskSpec:
+          steps:
+          - name: step1
+            image: alpine
+            script: |
+              exit 0
+      - name: task3
+        runAfter: [task2]
+        taskSpec:
+          steps:
+          - name: step1
+            image: alpine
+            script: |
+              exit 0              

@@ -1,0 +1,148 @@
+# task 1 skipped due to when
+# so task 2 and 3 executes successfully
+# apiVersion: tekton.dev/v1
+# kind: PipelineRun
+# metadata:
+#   generateName: 2-task-order-dep-when-
+# spec:
+#   params:
+#     - name: p1
+#       value: bad
+#   pipelineSpec:
+#     params:
+#       - name: p1
+#     tasks:
+#       - name: task1
+#         when:
+#           - input: $(params.p1)
+#             operator: in
+#             values:
+#               - good
+#         taskSpec:
+#           results:
+#             - name: suffix
+#           steps:
+#             - name: step1
+#               image: alpine
+#               script: |
+#                 echo -n "suffix" > $(results.suffix.path)
+#       - name: task2
+#         runAfter: [task1]
+#         onError: continue
+#         taskSpec:
+#           params:
+#             - name: arg
+#           steps:
+#             - name: step1
+#               image: alpine
+#               script: |
+#                 echo "$(params.arg)"
+#         params:
+#           - name: arg
+#             value: good
+#             #value: "$(tasks.task1.results.suffix)"
+#       - name: task3
+#         runAfter: [task2]
+#         onError: continue
+#         taskSpec:
+#           steps:
+#             - name: step1
+#               image: alpine
+#               script: |
+#                 echo hello
+---
+# onError:continue task referring to a result not available
+# skip due to Results were missing
+# apiVersion: tekton.dev/v1
+# kind: PipelineRun
+# metadata:
+#   generateName: 3-task-with-skip-
+# spec:
+#   pipelineSpec:
+#     tasks:
+#       - name: task1
+#         onError: stopAndFail
+#         taskSpec:
+#           results:
+#             - name: suffix
+#           steps:
+#             - name: step1
+#               image: alpine
+#               onError: continue
+#               script: |
+#                 echo -n "suffix" > $(results.suffix.path)
+#                 exit 1
+#       - name: task2
+#         onError: stopAndFail
+#         taskSpec:
+#           params:
+#             - name: arg        
+#           steps:
+#             - name: step1
+#               image: alpine
+#               script: |
+#                 echo "$(params.arg)"
+#         params:
+#         - name: arg
+#           value: "prefix:$(tasks.task1.results.suffix)"
+#       - name: task3
+#         runAfter: [task2]
+#         taskSpec:
+#           steps:
+#           - name: step1
+#             image: alpine
+#             script: |
+#               exit 0      
+---
+# task 1 skipped due to when
+# task 2 skips due to missing result
+# task 3 skips due to 2 is skipped
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  generateName: 2-task-order-dep-when-
+spec:
+  params:
+    - name: p1
+      value: bad
+  pipelineSpec:
+    params:
+      - name: p1
+    tasks:
+      - name: task1
+        when:
+          - input: $(params.p1)
+            operator: in
+            values:
+              - good
+        taskSpec:
+          results:
+            - name: suffix
+          steps:
+            - name: step1
+              image: alpine
+              script: |
+                echo -n "suffix" > $(results.suffix.path)
+      - name: task2
+        onError: continue
+        taskSpec:
+          params:
+            - name: arg
+          steps:
+            - name: step1
+              image: alpine
+              script: |
+                echo "$(params.arg)"
+        params:
+          - name: arg
+            #value: good
+            value: "$(tasks.task1.results.suffix)"
+      - name: task3
+        runAfter: [task2]
+        onError: continue
+        taskSpec:
+          steps:
+            - name: step1
+              image: alpine
+              script: |
+                echo hello
