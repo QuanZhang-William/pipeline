@@ -728,8 +728,13 @@ func (c *Reconciler) runNextSchedulableTask(ctx context.Context, pr *v1.Pipeline
 	logger := logging.FromContext(ctx)
 	recorder := controller.GetEventRecorder(ctx)
 
+	logger.Infof("Quan Test in runNextSchedulableTask")
+
 	// nextRpts holds a list of pipeline tasks which should be executed next
 	nextRpts, err := pipelineRunFacts.DAGExecutionQueue()
+	for _, nextP := range nextRpts {
+		logger.Infof("Quan Test next: %s", nextP.PipelineTask.Name)
+	}
 	if err != nil {
 		logger.Errorf("Error getting potential next tasks for valid pipelinerun %s: %v", pr.Name, err)
 		return controller.NewPermanentError(err)
