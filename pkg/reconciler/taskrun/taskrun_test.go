@@ -944,6 +944,82 @@ spec:
 	}
 }
 
+func TestEnumValidation(t *testing.T) {
+	tcs := []struct {
+		name        string
+		params      []v1.Param
+		paramSpecs  v1.ParamSpecs
+		expectedErr error
+	}{{
+		name: "input in the enum list",
+		params: []v1.Param{
+			{
+				Name: "p1",
+				Value: v1.ParamValue{
+					StringVal: "v1",
+				},
+			},
+			{
+				Name: "p2",
+				Value: v1.ParamValue{
+					StringVal: "v2",
+				},
+			},
+			{
+				Name: "p3",
+				Value: v1.ParamValue{
+					ArrayVal: []string{"vvvvv"},
+				},
+			},
+		},
+		paramSpecs: v1.ParamSpecs{
+			{
+				Name: "p1",
+				Enum: []string{"v1", "v2", "v3"},
+			},
+			{
+				Name: "p2",
+				Enum: []string{"v1", "v2", "v3"},
+			},
+		},
+	}, {
+		name: "input not in the enum list",
+		params: []v1.Param{
+			{
+				Name: "p1",
+				Value: v1.ParamValue{
+					StringVal: "v1",
+				},
+			},
+			{
+				Name: "p2",
+				Value: v1.ParamValue{
+					StringVal: "v4",
+				},
+			},
+		},
+		paramSpecs: v1.ParamSpecs{
+			{
+				Name: "p1",
+				Enum: []string{"v1", "v2", "v3"},
+			},
+			{
+				Name: "p2",
+				Enum: []string{"v1", "v2", "v3"},
+			},
+		},
+		expectedErr: fmt.Errorf("param not in enum list"),
+	}}
+
+	for _, tc := range tcs {
+		err := ValidateEnumParam(context.Background(), tc.params, tc.paramSpecs)
+		if err != nil && tc.expectedErr == nil {
+			t.Errorf("expected err is nil, but got %v", err)
+
+		}
+	}
+}
+
 func TestAlphaReconcile(t *testing.T) {
 	names.TestingSeed()
 	taskRunWithOutputConfig := parse.MustParseV1TaskRun(t, `

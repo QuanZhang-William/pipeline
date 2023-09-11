@@ -62,6 +62,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	corev1Listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/utils/clock"
+	"k8s.io/utils/strings/slices"
 	"knative.dev/pkg/apis"
 	"knative.dev/pkg/changeset"
 	"knative.dev/pkg/controller"
@@ -391,6 +392,12 @@ func (c *Reconciler) prepare(ctx context.Context, tr *v1.TaskRun) (*v1.TaskSpec,
 		Kind:     resources.GetTaskKind(tr),
 	}
 
+	if err := ValidateEnumParam(ctx, tr.Spec.Params, rtr.TaskSpec.Params); err != nil {
+		logger.Errorf("Quan: param enum validation are invalid: %s, err: %v", tr.Name, err)
+		tr.Status.MarkResourceFailed("param enum validation are invalid", err)
+		return nil, nil, controller.NewPermanentError(err)
+	}
+
 	if err := validateTaskSpecRequestResources(taskSpec); err != nil {
 		logger.Errorf("TaskRun %s taskSpec request resources are invalid: %v", tr.Name, err)
 		tr.Status.MarkResourceFailed(podconvert.ReasonFailedValidation, err)
@@ -453,6 +460,33 @@ func (c *Reconciler) prepare(ctx context.Context, tr *v1.TaskRun) (*v1.TaskSpec,
 	}
 
 	return taskSpec, rtr, nil
+}
+
+func ValidateEnumParam(ctx context.Context, params []v1.Param, paramSpec v1.ParamSpecs) error {
+	// Quan: validate param input in the allowlist
+	// convert taskspec param to map[paramName]value
+	specParams := map[string]string{}
+	for _, param := range params {
+		if param.Value.StringVal == "" {
+			continue
+		}
+
+		specParams[param.Name] = param.Value.StringVal
+	}
+
+	// iterate through paramSpec, check for the ones in string type AND has allowlist
+	for _, param := range paramSpec {
+		if len(param.Enum) == 0 {
+			continue
+		}
+
+		enums := param.Enum
+		if !slices.Contains(enums, specParams[param.Name]) {
+			return fmt.Errorf("param not in enum list")
+		}
+	}
+
+	return nil
 }
 
 // `reconcile` creates the Pod associated to the TaskRun, and it pulls back status

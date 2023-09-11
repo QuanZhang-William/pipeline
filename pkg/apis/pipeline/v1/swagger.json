@@ -343,6 +343,13 @@
           "description": "Description is a user-facing description of the parameter that may be used to populate a UI.",
           "type": "string"
         },
+        "enum": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "default": ""
+          }
+        },
         "name": {
           "description": "Name declares the name by which a parameter is referenced.",
           "type": "string",
@@ -1070,6 +1077,13 @@
       "description": "PropertySpec defines the struct for object keys",
       "type": "object",
       "properties": {
+        "enum": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "default": ""
+          }
+        },
         "type": {
           "type": "string"
         }

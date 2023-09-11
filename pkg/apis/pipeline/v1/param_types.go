@@ -53,6 +53,9 @@ type ParamSpec struct {
 	// parameter.
 	// +optional
 	Default *ParamValue `json:"default,omitempty"`
+
+	// +optional
+	Enum Enum `json:"enum,omitempty"`
 }
 
 // ParamSpecs is a list of ParamSpec
@@ -61,7 +64,10 @@ type ParamSpecs []ParamSpec
 // PropertySpec defines the struct for object keys
 type PropertySpec struct {
 	Type ParamType `json:"type,omitempty"`
+	Enum Enum      `json:"enum,omitempty"`
 }
+
+type Enum []string
 
 // SetDefaults set the default type
 func (pp *ParamSpec) SetDefaults(context.Context) {

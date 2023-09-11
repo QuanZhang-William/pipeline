@@ -1456,6 +1456,13 @@ TaskSpec
 </tr>
 </tbody>
 </table>
+<h3 id="tekton.dev/v1.Enum">Enum
+(<code>[]string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#tekton.dev/v1.ParamSpec">ParamSpec</a>, <a href="#tekton.dev/v1.PropertySpec">PropertySpec</a>)
+</p>
+<div>
+</div>
 <h3 id="tekton.dev/v1.IncludeParams">IncludeParams
 </h3>
 <div>
@@ -1689,6 +1696,19 @@ ParamValue
 <p>Default is the value a parameter takes if no input value is supplied. If
 default is set, a Task may be executed without a supplied value for the
 parameter.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>enum</code><br/>
+<em>
+<a href="#tekton.dev/v1.Enum">
+Enum
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
 </td>
 </tr>
 </tbody>
@@ -3102,6 +3122,18 @@ this field is false and so declared workspaces are required.</p>
 <em>
 <a href="#tekton.dev/v1.ParamType">
 ParamType
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>enum</code><br/>
+<em>
+<a href="#tekton.dev/v1.Enum">
+Enum
 </a>
 </em>
 </td>

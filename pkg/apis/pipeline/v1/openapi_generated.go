@@ -787,6 +787,20 @@ func schema_pkg_apis_pipeline_v1_ParamSpec(ref common.ReferenceCallback) common.
 							Ref:         ref("github.com/tektoncd/pipeline/pkg/apis/pipeline/v1.ParamValue"),
 						},
 					},
+					"enum": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"name"},
 			},
@@ -2141,6 +2155,20 @@ func schema_pkg_apis_pipeline_v1_PropertySpec(ref common.ReferenceCallback) comm
 						SchemaProps: spec.SchemaProps{
 							Type:   []string{"string"},
 							Format: "",
+						},
+					},
+					"enum": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
 						},
 					},
 				},
