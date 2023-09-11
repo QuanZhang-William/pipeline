@@ -392,6 +392,7 @@ func (c *Reconciler) prepare(ctx context.Context, tr *v1.TaskRun) (*v1.TaskSpec,
 		Kind:     resources.GetTaskKind(tr),
 	}
 
+	logger.Infof("Quan: validating input in TaskRun: %v", rtr.TaskSpec.Params)
 	if err := ValidateEnumParam(ctx, tr.Spec.Params, rtr.TaskSpec.Params); err != nil {
 		logger.Errorf("Quan: param enum validation are invalid: %s, err: %v", tr.Name, err)
 		tr.Status.MarkResourceFailed("param enum validation are invalid", err)

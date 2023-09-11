@@ -467,6 +467,12 @@ func (c *Reconciler) reconcile(ctx context.Context, pr *v1.PipelineRun, getPipel
 		return controller.NewPermanentError(err)
 	}
 
+	if err := taskrun.ValidateEnumParam(ctx, pr.Spec.Params, pipelineSpec.Params); err != nil {
+		logger.Errorf("Quan: param enum validation are invalid: %s, err: %v", pr.Name, err)
+		pr.Status.MarkFailed("Invalid PipelineRun Param", "param enum validation are invalid", err)
+		return controller.NewPermanentError(err)
+	}
+
 	// Ensure that the PipelineRun provides all the parameters required by the Pipeline
 	if err := resources.ValidateRequiredParametersProvided(&pipelineSpec.Params, &pr.Spec.Params); err != nil {
 		// This Run has failed, so we need to mark it as failed and stop reconciling it
