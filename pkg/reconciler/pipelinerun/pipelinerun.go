@@ -378,6 +378,13 @@ func (c *Reconciler) resolvePipelineState(
 			}
 			return nil, controller.NewPermanentError(err)
 		}
+
+		if err := taskrun.ValidateEnumParam(ctx, task.Params, resolvedTask.ResolvedTask.TaskSpec.Params); err != nil {
+			//logger.Errorf("Quan: param enum validation are invalid: %s, err: %v", pr.Name, err)
+			pr.Status.MarkFailed("Invalid PipelineRun Param", "param enum validation are invalid", err)
+			return nil, controller.NewPermanentError(err)
+		}
+
 		if resolvedTask.ResolvedTask != nil && resolvedTask.ResolvedTask.VerificationResult != nil {
 			cond, err := conditionFromVerificationResult(resolvedTask.ResolvedTask.VerificationResult, pr, task.Name)
 			pr.Status.SetCondition(cond)
@@ -532,6 +539,19 @@ func (c *Reconciler) reconcile(ctx context.Context, pr *v1.PipelineRun, getPipel
 	pipelineSpec = resources.ApplyWorkspaces(pipelineSpec, pr)
 	// Update pipelinespec of pipelinerun's status field
 	pr.Status.PipelineSpec = pipelineSpec
+
+	// Quan validate each pipeline task yaml
+	for _, task := range pipelineSpec.Tasks {
+		if task.TaskSpec == nil {
+			continue
+		}
+
+		if err := taskrun.ValidateEnumParam(ctx, task.Params, task.TaskSpec.Params); err != nil {
+			logger.Errorf("Quan2: param enum validation are invalid: %s, err: %v", pr.Name, err)
+			pr.Status.MarkFailed("Invalid PipelineRun Param in PipelineSpec", "param enum validation are invalid", err)
+			return controller.NewPermanentError(err)
+		}
+	}
 
 	// pipelineState holds a list of pipeline tasks after fetching their resolved Task specs.
 	// pipelineState also holds a taskRun for each pipeline task after the taskRun is created

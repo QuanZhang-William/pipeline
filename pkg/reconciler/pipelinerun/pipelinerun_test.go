@@ -603,6 +603,9 @@ metadata:
   name: test-pipeline-run-success
   namespace: foo
 spec:
+  params:
+    - name: message
+      value: "v2"
   pipelineRef:
     name: test-pipeline
 `),
@@ -613,12 +616,24 @@ metadata:
   name: test-pipeline
   namespace: foo
 spec:
+  params:
+    - name: message
+      type: string
+      enum: ["v1", "v2"]
   tasks:
     - name: unit-test-task-spec
+      params:
+        - name: messageee
+          value: $(params.message)
       taskSpec:
+        params:
+          - name: messageee
+            enum: ["v1"]
         steps:
           - name: mystep
             image: myimage
+            script: |
+              echo $(params.messageee)
 `),
 	}
 

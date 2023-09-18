@@ -127,11 +127,11 @@ func (ts *TaskRunSpec) validateInlineParameters(ctx context.Context) (errs *apis
 		return errs
 	}
 
-	for _, p := range ts.TaskSpec.Params {
-		if len(p.Enum) > 0 {
-			return apis.ErrInvalidValue(p.Type, fmt.Sprintf("%s.type", p.Name), fmt.Sprint("enum is not allowed in inline tasks"))
-		}
-	}
+	// for _, p := range ts.TaskSpec.Params {
+	// 	if len(p.Enum) > 0 {
+	// 		return apis.ErrInvalidValue(p.Type, fmt.Sprintf("%s.type", p.Name), fmt.Sprint("enum is not allowed in inline tasks"))
+	// 	}
+	// }
 
 	paramSpecForValidation := make(map[string]ParamSpec)
 	for _, p := range ts.Params {
