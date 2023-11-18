@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/clock"
 	"knative.dev/pkg/apis"
+	"knative.dev/pkg/logging"
 )
 
 const (
@@ -290,7 +291,9 @@ func (facts *PipelineRunFacts) IsGracefullyStopped() bool {
 }
 
 // DAGExecutionQueue returns a list of DAG tasks which needs to be scheduled next
-func (facts *PipelineRunFacts) DAGExecutionQueue() (PipelineRunState, error) {
+func (facts *PipelineRunFacts) DAGExecutionQueue(ctx context.Context) (PipelineRunState, error) {
+
+	logger := logging.FromContext(ctx)
 	var tasks PipelineRunState
 	// when pipelinerun is cancelled or gracefully cancelled, do not schedule any new tasks,
 	// and only wait for all running tasks to complete (without exhausting retries).
@@ -299,7 +302,9 @@ func (facts *PipelineRunFacts) DAGExecutionQueue() (PipelineRunState, error) {
 	}
 	// candidateTasks is initialized to DAG root nodes to start pipeline execution
 	// candidateTasks is derived based on successfully finished tasks and/or skipped tasks
+	logger.Infof("Quan Test DAGExecutionQueue completed: %v", facts.completedOrSkippedDAGTasks())
 	candidateTasks, err := dag.GetCandidateTasks(facts.TasksGraph, facts.completedOrSkippedDAGTasks()...)
+	logger.Infof("Quan Test DAGExecutionQueue candidateTasks: %v", candidateTasks)
 	if err != nil {
 		return tasks, err
 	}

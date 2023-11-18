@@ -1013,7 +1013,7 @@ func TestDAGExecutionQueue(t *testing.T) {
 					Clock: testClock,
 				},
 			}
-			queue, err := facts.DAGExecutionQueue()
+			queue, err := facts.DAGExecutionQueue(context.Background())
 			if err != nil {
 				t.Errorf("unexpected error getting DAG execution queue: %s", err)
 			}
@@ -1103,7 +1103,7 @@ func TestDAGExecutionQueueSequentialTasks(t *testing.T) {
 					Clock: testClock,
 				},
 			}
-			queue, err := facts.DAGExecutionQueue()
+			queue, err := facts.DAGExecutionQueue(context.Background())
 			if err != nil {
 				t.Errorf("unexpected error getting DAG execution queue but got error %s", err)
 			}
@@ -1196,7 +1196,7 @@ func TestDAGExecutionQueueSequentialRuns(t *testing.T) {
 					Clock: testClock,
 				},
 			}
-			queue, err := facts.DAGExecutionQueue()
+			queue, err := facts.DAGExecutionQueue(context.Background())
 			if err != nil {
 				t.Errorf("unexpected error getting DAG execution queue but got error %s", err)
 			}

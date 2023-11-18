@@ -731,7 +731,7 @@ func (c *Reconciler) runNextSchedulableTask(ctx context.Context, pr *v1.Pipeline
 	logger.Infof("Quan Test in runNextSchedulableTask")
 
 	// nextRpts holds a list of pipeline tasks which should be executed next
-	nextRpts, err := pipelineRunFacts.DAGExecutionQueue()
+	nextRpts, err := pipelineRunFacts.DAGExecutionQueue(ctx)
 	for _, nextP := range nextRpts {
 		logger.Infof("Quan Test next: %s", nextP.PipelineTask.Name)
 	}
